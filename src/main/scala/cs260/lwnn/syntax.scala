@@ -104,16 +104,16 @@ case class Access( e:Exp, x:Var ) extends Exp
 case class Binop( op:BinaryOp, e1:Exp, e2:Exp ) extends Exp
 
 sealed abstract class BinaryOp
-case object ⌜+⌝ extends Bop
-case object ⌜−⌝ extends Bop
-case object ⌜×⌝ extends Bop
-case object ⌜÷⌝ extends Bop
-case object ⌜<⌝ extends Bop
-case object ⌜≤⌝ extends Bop
-case object ⌜∧⌝ extends Bop
-case object ⌜∨⌝ extends Bop
-case object ⌜=⌝ extends Bop
-case object ⌜≠⌝ extends Bop
+case object ⌜+⌝ extends BinaryOp
+case object ⌜−⌝ extends BinaryOp
+case object ⌜×⌝ extends BinaryOp
+case object ⌜÷⌝ extends BinaryOp
+case object ⌜<⌝ extends BinaryOp
+case object ⌜≤⌝ extends BinaryOp
+case object ⌜∧⌝ extends BinaryOp
+case object ⌜∨⌝ extends BinaryOp
+case object ⌜=⌝ extends BinaryOp
+case object ⌜≠⌝ extends BinaryOp
 
 /* Parser */
 
@@ -124,10 +124,11 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   type Parser[T] = PackratParser[T]
   
   // reserved keywords
-  lexical.reserved += ("class", "extends", "fields", "methods",
-    "def", "return", "new", "if", "else", "while", "int", "bool", "string", "null")
+  lexical.reserved ++= Seq("class", "extends", "fields", "methods",
+    "def", "return", "new", "if", "else", "while", "int", "bool", "string", "null",
+     "true", "false")
 
-  lexical.delimiters += ( "+", "-", "*", "/", "&", "|", "=", "!=",
+  lexical.delimiters ++= Seq( "+", "-", "*", "/", "&", "|", "=", "!=",
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
 
@@ -138,7 +139,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
     // parse the program
     val lexer = new lexical.Scanner(prog)
-    val result = phrase(program)(lexer)
+    val result = phrase(classP)(lexer)
     
     // return result or a useful error message
     result match {
@@ -149,40 +150,93 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
         println("Parse error: " + msg)
         println("At line " + next.pos.line + ", column " + next.pos.column)
         println(next.pos.longString)
-        sys.exit(1) 
+        //sys.exit(1)
       }
     }
   }
 
-  lazy val program = sep(classP)
+  lazy val program = rep(classP)
 
-  lazy val classP = 
+  lazy val classP: Parser[Class] =
     "class" ~> className ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {
-      case name ~ None ~ "{" ~ (fields, methods) ~ "}" => 
-        Class(className, "Object", fields, methods)
-      case name ~ Some(superClass) ~ "{" ~ (fields, methods) ~ "}" =>
-        Class(className, superClass, fields, methods)
+      case name ~ None ~ "{" ~ body ~ "}" =>
+        Class(name, "Object", body._1, body._2)
+      case name ~ Some(superClass) ~ "{" ~ body ~ "}" =>
+        Class(name, superClass, body._1, body._2)
+    }
 
-  lazy val classBody = (Set(), Set())
+  lazy val classBody: Parser[(Set[Decl], Set[Method])] =
+    opt("fields" ~> rep1sep(fieldP, ",") <~ ";") ~ opt("methods" ~> rep1(methodP)) ^^ {
+      case Some(fields) ~ Some(methods) => (fields.toSet, methods.toSet)
+      case Some(fields) ~ None          => (fields.toSet, Set.empty[Method])
+      case None ~ Some(methods)         => (Set.empty[Decl], methods.toSet)
+      case None ~ None                  => (Set.empty[Decl], Set.empty[Method])
+    }
 
-  lazy val typeP = "int" | "bool" | "string" | "null" | className
+  lazy val fieldP: Parser[Decl] = variable ~ ":" ~ typeP ^^ {
+    case x ~ _ ~ t => Decl(x, t)
+  }
 
-  lazy val methodP = ???
+  lazy val typeP = (
+      "int"     ^^ (_ => IntT)
+    | "bool"    ^^ (_ => BoolT)
+    | "string"  ^^ (_ => StrT)
+    | "null"    ^^ (_ => NullT)
+    | className ^^ (cn => ClassT(cn))
+  )
 
-  lazy val stmtP = ???
+  lazy val methodP: Parser[Method] =
+  "def" ~ methodName ~ ("(" ~> paramList <~ ")")~ opt(":" ~> typeP) ~ "=" ~ ("{" ~> methodBody <~ "}") ^^ {
+    case _ ~ name ~ params ~ Some(tpe) ~ _ ~ body =>
+      Method(name, params, tpe, body)
+    case _ ~ name ~ params ~ None ~ _ ~ body => ??? // figure out type based on return
+  }
 
-  lazy val expP = ???
+  lazy val paramList: Parser[Seq[Decl]]=
+    repsep(variable ~ ":" ~ typeP ^^ { case x ~ _ ~ t => Decl(x, t) }, ",")
+
+  lazy val methodBody: Parser[List[Stmt]] = opt(stmtSeq) ~ ("return" ~> expP) <~ ";" ^^ {
+    case Some(stmts) ~ e => stmts ::: (Return(e) :: Nil)
+    case None ~ e => Return(e) :: Nil
+  }
+
+  lazy val stmtP: Parser[Stmt] = (
+      variable ~ ":=" ~ expP
+    | expP ~ "." ~ variable ~ ":=" ~ expP
+    | variable ~ ":=" ~ expP ~ "." ~ methodName ~ "(" ~ repsep(expP, ",") ~ ")"
+    | variable ~ ":=" ~ "new" ~ className
+    | "if" ~ expP ~ "{" ~ stmtSeq ~ "}" ~ "else" ~ "{" ~ stmtSeq ~ "}"
+    | "while" ~ expP ~ "{" ~ stmtSeq ~ "}"
+  ) ^^^ null
+
+  lazy val stmtSeq: Parser[List[Stmt]] = rep1sep(stmtP, ";") <~ ";"
+
+  lazy val expP: Parser[Exp] = (
+      value
+    | "null" ^^ (_ => Null())
+    | variable
+    | expP ~ variable ^^ { case e ~ x => Access(e, x) }
+    | expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(⌜+⌝, e1, e2) }
+  )
+
+  /* need to do non-determinism here */
+  lazy val value: Parser[Exp] = (
+      int ^^ (d => Nums(Set(BigInt(d))))
+    | bool ^^ (b => Bools(Set(b)))
+    | string ^^ (s => Strs(Set(s)))
+  )
 
   lazy val binOpP = ???
   
-  lazy val int = """(0|[1-9][0-9]*])"""r
+  lazy val int: Parser[String] = numericLit
 
-  lazy val bool = "true" | "false"
+  lazy val bool = "true" ^^^ true | "false" ^^^ false
 
   lazy val string = stringLit
 
-  lazy val variable = ident
+  lazy val variable: Parser[Var] = ident ^^ (v => Var(v))
 
   lazy val className = ident
 
   lazy val methodName = ident
+}
