@@ -1,6 +1,16 @@
 package cs260.lwnn.syntax
 
 //——————————————————————————————————————————————————————————————————————————————
+// Convenient type aliases
+
+object TypeAliases {
+  type ClassName = String
+  type MethodName = String
+}
+
+import TypeAliases._
+
+//——————————————————————————————————————————————————————————————————————————————
 // AST base class
 
 sealed abstract class AST {
@@ -16,13 +26,13 @@ object AST {
 //——————————————————————————————————————————————————————————————————————————————
 // Program, Class, Method, Decl
 
-case class Program( classes:Set[Class] ) extends AST
+case class Program( classes:Seq[Class] ) extends AST
 
-case class Class( name:String, superclass:String, fields:Set[Decl],
-  methods:Set[Method] ) extends AST
+case class Class( cn:ClassName, supercn:ClassName, fields:Set[Decl],
+                  methods:Set[Method] ) extends AST
 
-case class Method( name:String, params:Seq[Decl], τret:Type,
-  body:Seq[Stmt] ) extends AST
+case class Method( mn:MethodName, params:Seq[Decl], τret:Type,
+                   body:Seq[Stmt], rete:Exp ) extends AST
 
 case class Decl( x:Var, τ:Type ) extends AST
 
@@ -70,26 +80,27 @@ case object NullT extends Type {
     }
 }
 
-case class ClassT( name:String ) extends Type {
+case class ClassT( cn:ClassName ) extends Type {
   // the subtyping of classes depends on the user's program
-  def ⊑ ( τ:Type ) =
+  def ⊑ ( τ:Type )/* (implicit gamma: TypeEnv) */ =
     sys.error("!!TODO: define subtyping on classes")
 }
 
 //——————————————————————————————————————————————————————————————————————————————
 // Stmt
 //
-// we include Return as a Stmt for convenience; the parser will ensure
-// it only shows up at the end of a method.
+// We include a Print statement not in the semantics, which prints out
+// the value of an expression; this is used to help debug the
+// interpreters by inspecting the values they compute.
 
 sealed abstract class Stmt extends AST
 case class Assign( x:Var, e:Exp ) extends Stmt
 case class Update( e1:Exp, x:Var, e2:Exp ) extends Stmt
-case class Call( x:Var, e:Exp, mn:String, args:Seq[Exp] ) extends Stmt
-case class New( x:Var, cn:String, args:Seq[Exp] ) extends Stmt
+case class Call( x:Var, e:Exp, mn:MethodName, args:Seq[Exp] ) extends Stmt
+case class New( x:Var, cn:ClassName, args:Seq[Exp] ) extends Stmt
 case class If( e:Exp, tb:Seq[Stmt], fb:Seq[Stmt] ) extends Stmt
 case class While( e:Exp, body:Seq[Stmt] ) extends Stmt
-case class Return( e:Exp ) extends Stmt
+case class Print( e:Exp ) extends Stmt
 
 //——————————————————————————————————————————————————————————————————————————————
 // Exp, BinaryOp
@@ -98,7 +109,7 @@ sealed abstract class Exp extends AST
 case class Nums( ns:Set[BigInt] ) extends Exp
 case class Bools( bs:Set[Boolean] ) extends Exp
 case class Strs( strs:Set[String] ) extends Exp
-case class Null() extends Exp
+case class Nulls() extends Exp
 case class Var( name:String ) extends Exp
 case class Access( e:Exp, x:Var ) extends Exp
 case class Binop( op:BinaryOp, e1:Exp, e2:Exp ) extends Exp
@@ -112,7 +123,7 @@ case object ⌜<⌝ extends BinaryOp
 case object ⌜≤⌝ extends BinaryOp
 case object ⌜∧⌝ extends BinaryOp
 case object ⌜∨⌝ extends BinaryOp
-case object ⌜=⌝ extends BinaryOp
+case object ⌜≈⌝ extends BinaryOp
 case object ⌜≠⌝ extends BinaryOp
 
 /* Parser */
@@ -122,7 +133,9 @@ import scala.util.parsing.combinator.syntactical._
 
 object LwnnParser extends StandardTokenParsers with PackratParsers {
   type Parser[T] = PackratParser[T]
-  
+
+  var currentClass: Type = ClassT("TopClass")
+
   // reserved keywords
   lexical.reserved ++= Seq("class", "extends", "fields", "methods",
     "def", "return", "new", "if", "else", "while", "int", "bool", "string", "null",
@@ -140,13 +153,13 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     // parse the program
     val lexer = new lexical.Scanner(prog)
     val result = phrase(classP)(lexer)
-    
+
     // return result or a useful error message
     result match {
-      case Success(ast,_) => 
+      case Success(ast,_) =>
         ast
 
-      case NoSuccess(msg,next) => { 
+      case NoSuccess(msg,next) => {
         println("Parse error: " + msg)
         println("At line " + next.pos.line + ", column " + next.pos.column)
         println(next.pos.longString)
@@ -158,12 +171,13 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val program = rep(classP)
 
   lazy val classP: Parser[Class] =
-    "class" ~> className ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {
+    "class" ~> classNameDef ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {
       case name ~ None ~ "{" ~ body ~ "}" =>
-        Class(name, "Object", body._1, body._2)
+        Class(name, "TopClass", body._1, body._2)
       case name ~ Some(superClass) ~ "{" ~ body ~ "}" =>
         Class(name, superClass, body._1, body._2)
     }
+
 
   lazy val classBody: Parser[(Set[Decl], Set[Method])] =
     opt("fields" ~> rep1sep(fieldP, ",") <~ ";") ~ opt("methods" ~> rep1(methodP)) ^^ {
@@ -186,34 +200,65 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   )
 
   lazy val methodP: Parser[Method] =
-  "def" ~ methodName ~ ("(" ~> paramList <~ ")")~ opt(":" ~> typeP) ~ "=" ~ ("{" ~> methodBody <~ "}") ^^ {
-    case _ ~ name ~ params ~ Some(tpe) ~ _ ~ body =>
-      Method(name, params, tpe, body)
-    case _ ~ name ~ params ~ None ~ _ ~ body => ??? // figure out type based on return
+  "def" ~ methodName ~ ("(" ~> paramList <~ ")") ~ opt(":" ~> typeP) ~ "=" ~ ("{" ~> methodBody <~ "}") ^^ {
+    case _ ~ mname ~ params ~ retType ~ _ ~ ((body, ret)) => retType match {
+      case None => Method(mname, params, currentClass, body, ret)
+      case Some(tpe) => Method(mname, params, tpe, body, ret)
+    }
   }
 
   lazy val paramList: Parser[Seq[Decl]]=
     repsep(variable ~ ":" ~ typeP ^^ { case x ~ _ ~ t => Decl(x, t) }, ",")
 
-  lazy val methodBody: Parser[List[Stmt]] = opt(stmtSeq) ~ ("return" ~> expP) <~ ";" ^^ {
-    case Some(stmts) ~ e => stmts ::: (Return(e) :: Nil)
-    case None ~ e => Return(e) :: Nil
+  lazy val methodBody: Parser[(List[Stmt], Exp)] = opt(stmtSeq) ~ opt(("return" ~> expP) <~ ";") ^^ {
+    case Some(stmts) ~ Some(ret) => stmts -> ret
+    case Some(stmts) ~ None      => stmts -> Var("self")
+    case None ~ Some(ret)        => Nil   -> ret
+    case None ~ None             => Nil   -> Var("self")
   }
-
-  lazy val stmtP: Parser[Stmt] = (
-      variable ~ ":=" ~ expP
-    | expP ~ "." ~ variable ~ ":=" ~ expP
-    | variable ~ ":=" ~ expP ~ "." ~ methodName ~ "(" ~ repsep(expP, ",") ~ ")"
-    | variable ~ ":=" ~ "new" ~ className
-    | "if" ~ expP ~ "{" ~ stmtSeq ~ "}" ~ "else" ~ "{" ~ stmtSeq ~ "}"
-    | "while" ~ expP ~ "{" ~ stmtSeq ~ "}"
-  ) ^^^ null
 
   lazy val stmtSeq: Parser[List[Stmt]] = rep1sep(stmtP, ";") <~ ";"
 
+  lazy val stmtP: Parser[Stmt] = (
+      assign
+    | update
+    | methodCall
+    | newClass
+    | ifStmt
+    | whileStmt
+  )
+
+  lazy val assign: Parser[Stmt] = variable ~ ":=" ~ expP ^^ {
+    case v ~ _ ~ e => Assign(v, e)
+  }
+
+  lazy val update: Parser[Stmt] = expP ~ "." ~ variable ~ ":=" ~ expP ^^ {
+    case obj ~ _ ~ field ~ _ ~ value => Update(obj, field, value)
+  }
+
+  lazy val newClass: Parser[Stmt] = variable ~ ":=" ~ "new" ~ className ~ argList ^^ {
+    case v ~ _ ~ _ ~ cls ~ params => New(v, cls, params)
+  }
+
+  lazy val methodCall: Parser[Stmt] = variable ~ ":=" ~ expP ~ "." ~ methodName ~ argList ^^ {
+    case v ~ _ ~ obj ~ _ ~ mname ~ params => Call(v, obj, mname, params)
+  }
+
+  lazy val ifStmt: Parser[Stmt] = "if" ~ expP ~ block ~ "else" ~  block ^^ {
+    case _ ~ e ~ tbranch ~ _ ~ fbranch => If(e, tbranch, fbranch)
+  }
+
+  lazy val whileStmt: Parser[Stmt] = "while" ~ expP ~ block ^^ {
+    case _ ~ guard ~ body => While(guard, body)
+  }
+
+  lazy val block = "{" ~> stmtSeq <~ "}"
+
+  lazy val argList = "(" ~> repsep(expP, ",") <~ ")"
+
   lazy val expP: Parser[Exp] = (
       value
-    | "null" ^^ (_ => Null())
+    | "null" ^^ (_ => Nulls())
     | variable
     | expP ~ variable ^^ { case e ~ x => Access(e, x) }
     | expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(⌜+⌝, e1, e2) }
@@ -227,7 +272,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   )
 
   lazy val binOpP = ???
-  
+
   lazy val int: Parser[String] = numericLit
 
   lazy val bool = "true" ^^^ true | "false" ^^^ false
@@ -237,6 +282,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val variable: Parser[Var] = ident ^^ (v => Var(v))
 
   lazy val className = ident
+
+  lazy val classNameDef: Parser[String] = ident >> { (s: String) =>
+    currentClass = ClassT(s); success(s)
+  }
 
   lazy val methodName = ident
 }
