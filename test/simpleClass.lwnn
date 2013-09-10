@@ -1,0 +1,8 @@
+class A {
+  fields a : int, b: int;
+  methods
+  def set(x: int, y: int) = {
+    a := x;
+    b := y;
+  }
+}

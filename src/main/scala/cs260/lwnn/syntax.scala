@@ -9,6 +9,7 @@ object TypeAliases {
 }
 
 import TypeAliases._
+import cs260.lwnn.typechecker._
 
 //——————————————————————————————————————————————————————————————————————————————
 // AST base class
@@ -42,6 +43,7 @@ case class Decl( x:Var, τ:Type ) extends AST
 sealed abstract class Type {
   // the subtyping operator (Scala won't allow the more usual <: notation)
   def ⊑ ( τ:Type ): Boolean
+  def subtypeOf(t: Type): Boolean = ⊑(t)
 }
 
 case object IntT extends Type {
@@ -82,8 +84,10 @@ case object NullT extends Type {
 
 case class ClassT( cn:ClassName ) extends Type {
   // the subtyping of classes depends on the user's program
-  def ⊑ ( τ:Type )/* (implicit gamma: TypeEnv) */ =
-    sys.error("!!TODO: define subtyping on classes")
+  def ⊑ ( τ:Type )(implicit gamma: Env) = τ match {
+    case ClassT(on) => cn == on
+    case _          => false
+  }
 }
 
 //——————————————————————————————————————————————————————————————————————————————
@@ -128,13 +132,47 @@ case object ⌜≠⌝ extends BinaryOp
 
 /* Parser */
 
+class UnifyOps(t: Type) {
+  def unify(tp: Type): Type =
+    if (t == tp) t
+    else throw new Exception("unify failed")
+}
+
+case class ClassTypes(clazz: Class) extends UnifyOps(ClassT(clazz.cn)) {
+
+  val fieldTable = Map(
+    (clazz match {
+      case Class(_, _, fields, _) =>
+        for (field <- fields) yield field.x -> field.τ
+    }).toSeq: _*
+  )
+
+  val methodTable = Map(
+    (clazz match {
+      case Class(_, _, _, methods)  =>
+        for (method <- methods) yield {
+          method.mn -> MethodType(method.τret, method.params.map { _.τ })
+        }
+    }).toSeq: _ *
+  )
+
+  case class MethodType(returnT: Type, argTs: Seq[Type])
+
+  def field(x: Var) = fieldTable(x)
+  def method(x: Var) = methodTable(x.name)
+}
+
 import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.syntactical._
+import scala.collection.mutable.{ Map => MMap }
+import cs260.lwnn._
 
 object LwnnParser extends StandardTokenParsers with PackratParsers {
+
   type Parser[T] = PackratParser[T]
 
   var currentClass: Type = ClassT("TopClass")
+  val classes = MMap[ClassT, ClassTypes]()
 
   // reserved keywords
   lexical.reserved ++= Seq("class", "extends", "fields", "methods",
@@ -145,14 +183,14 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
 
-  def getAST(program: String) = {
+  def getAST(source: String): AST = {
     // strip out comments
     val commentR = """##((#?[^#]+)*)##""".r
-    val prog = commentR.replaceAllIn( program, "" )
+    val cleanSource = commentR.replaceAllIn(source, "" )
 
     // parse the program
-    val lexer = new lexical.Scanner(prog)
-    val result = phrase(classP)(lexer)
+    val lexer = new lexical.Scanner(cleanSource)
+    val result = phrase(program)(lexer)
 
     // return result or a useful error message
     result match {
@@ -163,12 +201,18 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
         println("Parse error: " + msg)
         println("At line " + next.pos.line + ", column " + next.pos.column)
         println(next.pos.longString)
-        //sys.exit(1)
+        sys.exit(1)
       }
     }
   }
 
-  lazy val program = rep(classP)
+  lazy val program: Parser[Program] = rep(classP >> { cls =>
+    cls match {
+      case c @ Class(name, _, _, _) =>
+        classes(ClassT(name)) = new ClassTypes(cls)
+        success(cls)
+    }
+  }) ^^ { cs => Program(cs) }
 
   lazy val classP: Parser[Class] =
     "class" ~> classNameDef ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {
