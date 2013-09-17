@@ -277,10 +277,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val stmtSeq: Parser[List[Stmt]] = rep1sep(stmtP, ";") <~ ";"
 
   lazy val stmtP: Parser[Stmt] = (
-      methodCall
-    | assign
-    | update
+      update
     | newClass
+    | methodCall
+    | assign
     | ifStmt
     | whileStmt
   )
@@ -317,10 +317,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val argList = "(" ~> repsep(expP, ",") <~ ")"
 
   lazy val expP: Parser[Exp] = (
-      expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(op, e1, e2) }
-    | expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
+      value
     | variable
-    | value
+    | expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(op, e1, e2) }
+    | expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
     | "null" ^^ (_ => Nulls())
   )
 
@@ -338,8 +338,8 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     | "/"  ^^^ ⌜÷⌝
     | "<"  ^^^ ⌜<⌝
     | "<=" ^^^ ⌜≤⌝
-    | "&&" ^^^ ⌜∧⌝
-    | "||" ^^^ ⌜∨⌝
+    | "&" ^^^ ⌜∧⌝
+    | "|" ^^^ ⌜∨⌝
     | "="  ^^^ ⌜≈⌝
     | "!=" ^^^ ⌜≠⌝
   )

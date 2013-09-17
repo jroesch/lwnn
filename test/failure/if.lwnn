@@ -1,10 +1,10 @@
 class If {
   methods
   def If(dummy: int) = {
-    if (true & true) {
-      dummy := 2 + 2;
+    if (10) {
+      dummy := 200;
     } else {
-      dummy := 10;
+      dummy := 1000;
     };
   }
 }

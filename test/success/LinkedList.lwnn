@@ -1,0 +1,13 @@
+class LinkedListNode {
+  fields data: int, next: LinkedListNode;
+}
+
+class LinkedList {
+  fields head: LinkedListNode;
+
+  methods
+  def LinkedList(data: int, next: LinkedListNode, h: LinkedListNode) = {
+    h := new LinkedListNode(data, 10);
+    self.head := h;
+  }
+}
