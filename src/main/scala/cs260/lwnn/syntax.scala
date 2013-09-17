@@ -139,42 +139,6 @@ case object ⌜≈⌝ extends BinaryOp
 case object ⌜≠⌝ extends BinaryOp
 
 /* Parser */
-
-class UnifyOps(t: Type) {
-  def unify(tp: Type): Type =
-    if (t == tp) t
-    else throw new Exception("unify failed")
-}
-
-case class ClassTypes(clazz: Class) extends UnifyOps(ClassT(clazz.cn)) {
-
-  val fieldTable = Map(
-    (clazz match {
-      case Class(_, _, fields, _) =>
-        for (field <- fields) yield field.x -> field.τ
-    }).toSeq: _*
-  )
-
-  val methodTable = Map(
-    (clazz match {
-      case Class(_, _, _, methods)  =>
-        for (method <- methods) yield {
-          method.mn -> MethodType(method.τret, method.params.map { _.τ })
-        }
-    }).toSeq: _ *
-  )
-
-  val constructor = methodTable.get(clazz.cn).
-    getOrElse(MethodType(ClassT(clazz.cn), Nil))
-
-  case class MethodType(returnT: Type, argTs: Seq[Type])
-
-  def field(x: Var) = fieldTable(x)
-  def method(x: Var) = methodTable(x.name)
-  def superType = clazz.supercn
-  def selfType  = clazz.cn
-}
-
 import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.syntactical._
 import scala.collection.mutable.{ Map => MMap }
@@ -219,13 +183,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     }
   }
 
-  lazy val program: Parser[Program] = rep(classP >> { cls =>
-    cls match {
-      case c @ Class(name, _, _, _) =>
-        classes(ClassT(name)) = new ClassTypes(cls)
-        success(cls)
-    }
-  }) ^^ { cs => Program(cs) }
+  lazy val program: Parser[Program] = rep(classP) ^^ { cs => Program(cs) }
 
   lazy val classP: Parser[Class] =
     "class" ~> classNameDef ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {
@@ -329,6 +287,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
       int ^^ (d => Nums(Set(BigInt(d))))
     | bool ^^ (b => Bools(Set(b)))
     | string ^^ (s => Strs(Set(s)))
+    //| "[" ~> (value ~ ".." ~ value) <~ "]" ^^ question for Ben
   )
 
   lazy val binOpP = (
@@ -338,8 +297,8 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     | "/"  ^^^ ⌜÷⌝
     | "<"  ^^^ ⌜<⌝
     | "<=" ^^^ ⌜≤⌝
-    | "&" ^^^ ⌜∧⌝
-    | "|" ^^^ ⌜∨⌝
+    | "&"  ^^^ ⌜∧⌝
+    | "|"  ^^^ ⌜∨⌝
     | "="  ^^^ ⌜≈⌝
     | "!=" ^^^ ⌜≠⌝
   )

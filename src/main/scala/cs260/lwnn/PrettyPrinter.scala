@@ -64,12 +64,6 @@ class PrettyPrinter(t: AST) {
         case ⌜≠⌝ => "!="
       }
       s"${printTerm(e1)} $pOp ${printTerm(e2)}"
-    case t =>
-      println("--------");
-      println(t);
-      ???
-
-
   }
 
   def printSeq(xs: Seq[AST], sepBy: String, termBy: String = "") = {
