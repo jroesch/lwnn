@@ -1,0 +1,8 @@
+class If {
+  methods
+  def If(dummy: int) = {
+    if (true) {
+      dummy := 2 + 2;
+    };
+  }
+}

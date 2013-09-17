@@ -1,18 +1,13 @@
+class LinkedListNode {
+  fields data: int, next: LinkedListNode;
+}
+
 class LinkedList {
-  fields data: int, next: LinkedList;
+  fields head: LinkedListNode;
 
   methods
-  def LinkedList(data: int, next: LinkedList) = {
-    self.data := data;
-    self.next := next;
+  def LinkedList(data: int, next: LinkedListNode, head: LinkedListNode) = {
+    head := new LinkedListNode(data, 10);
+    self.head := head;
   }
-
-  def cons(x: int, temp: LinkedList): LinkedList = {
-    temp := new LinkedList(x, self);
-    return temp;
-  }
-
-  def snoc(): LinkedList = {
-    return next;
-  }  
 }

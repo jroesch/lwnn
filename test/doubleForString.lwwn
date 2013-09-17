@@ -1,0 +1,8 @@
+class DoubleForString {
+  fields x: string;
+  
+  methods
+  def DoubleForString() = {
+    x := 2;
+  }
+}

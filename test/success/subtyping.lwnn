@@ -1,0 +1,11 @@
+class A {}
+class B extends A {}
+class C extends B {}
+
+class Subtyping {
+  fields x: A;
+  methods
+  def Subtyping() = {
+    x := new C();
+  }
+}

@@ -42,13 +42,13 @@ case class Decl( x:Var, τ:Type ) extends AST
 
 sealed abstract class Type {
   // the subtyping operator (Scala won't allow the more usual <: notation)
-  def ⊑ ( τ:Type ): Boolean
-  def subtypeOf(t: Type): Boolean = ⊑(t)
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv): Boolean
+  def subtypeOf(t: Type)(implicit gamma: TypeEnv): Boolean = ⊑(t)
 }
 
 case object IntT extends Type {
   // IntT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type ) =
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
     τ match {
       case IntT ⇒ true
       case _ ⇒ false
@@ -57,7 +57,7 @@ case object IntT extends Type {
 
 case object BoolT extends Type {
   // BoolT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type ) =
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
     τ match {
       case BoolT ⇒ true
       case _ ⇒ false
@@ -66,7 +66,7 @@ case object BoolT extends Type {
 
 case object StrT extends Type {
   // StrT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type ) =
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
     τ match {
       case StrT ⇒ true
       case _ ⇒ false
@@ -75,17 +75,25 @@ case object StrT extends Type {
 
 case object NullT extends Type {
   // NullT is a subtype of itself and all classes
-  def ⊑ ( τ:Type ) =
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
     τ match {
       case NullT | _:ClassT ⇒ true
       case _ ⇒ false
     }
 }
 
-case class ClassT( cn:ClassName ) extends Type {
+case class ClassT(cn: ClassName) extends Type {
   // the subtyping of classes depends on the user's program
-  def ⊑ ( τ:Type )(implicit gamma: Env) = τ match {
-    case ClassT(on) => cn == on
+  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) = τ match {
+    case ClassT("TopClass") => true
+    case ClassT(_) if cn == "TopClass" => false
+    case o @ ClassT(on) =>
+      val tpe = gamma.classFor(this)
+      val other = gamma.classFor(o)
+      println(tpe, other)
+      if (tpe.selfType == other.selfType || tpe.superType == other.selfType)
+        true
+      else ClassT(tpe.superType).subtypeOf(o)
     case _          => false
   }
 }
@@ -156,10 +164,15 @@ case class ClassTypes(clazz: Class) extends UnifyOps(ClassT(clazz.cn)) {
     }).toSeq: _ *
   )
 
+  val constructor = methodTable.get(clazz.cn).
+    getOrElse(MethodType(ClassT(clazz.cn), Nil))
+
   case class MethodType(returnT: Type, argTs: Seq[Type])
 
   def field(x: Var) = fieldTable(x)
   def method(x: Var) = methodTable(x.name)
+  def superType = clazz.supercn
+  def selfType  = clazz.cn
 }
 
 import scala.util.parsing.combinator._
@@ -264,9 +277,9 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val stmtSeq: Parser[List[Stmt]] = rep1sep(stmtP, ";") <~ ";"
 
   lazy val stmtP: Parser[Stmt] = (
-      assign
+      methodCall
+    | assign
     | update
-    | methodCall
     | newClass
     | ifStmt
     | whileStmt
@@ -284,12 +297,15 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     case v ~ _ ~ _ ~ cls ~ params => New(v, cls, params)
   }
 
-  lazy val methodCall: Parser[Stmt] = variable ~ ":=" ~ expP ~ "." ~ methodName ~ argList ^^ {
+  lazy val methodCall: Parser[Stmt] = variable ~ ":=" ~ (variable | expP) ~ "." ~ methodName ~ argList ^^ {
     case v ~ _ ~ obj ~ _ ~ mname ~ params => Call(v, obj, mname, params)
   }
 
-  lazy val ifStmt: Parser[Stmt] = "if" ~ expP ~ block ~ "else" ~  block ^^ {
-    case _ ~ e ~ tbranch ~ _ ~ fbranch => If(e, tbranch, fbranch)
+  lazy val ifStmt: Parser[Stmt] = "if" ~ ("(" ~> expP <~ ")") ~ block ~ opt("else" ~>  block) ^^ {
+    case _ ~ e ~ tbranch ~ ofbranch => ofbranch match {
+      case None => If(e, tbranch, Seq())
+      case Some(fbranch) => If(e, tbranch, fbranch)
+    }
   }
 
   lazy val whileStmt: Parser[Stmt] = "while" ~ expP ~ block ^^ {
@@ -301,11 +317,11 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val argList = "(" ~> repsep(expP, ",") <~ ")"
 
   lazy val expP: Parser[Exp] = (
-      value
-    | "null" ^^ (_ => Nulls())
+      expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(op, e1, e2) }
+    | expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
     | variable
-    | expP ~ variable ^^ { case e ~ x => Access(e, x) }
-    | expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(⌜+⌝, e1, e2) }
+    | value
+    | "null" ^^ (_ => Nulls())
   )
 
   /* need to do non-determinism here */
@@ -315,7 +331,18 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     | string ^^ (s => Strs(Set(s)))
   )
 
-  lazy val binOpP = ???
+  lazy val binOpP = (
+      "+"  ^^^ ⌜+⌝
+    | "_"  ^^^ ⌜−⌝
+    | "*"  ^^^ ⌜×⌝
+    | "/"  ^^^ ⌜÷⌝
+    | "<"  ^^^ ⌜<⌝
+    | "<=" ^^^ ⌜≤⌝
+    | "&&" ^^^ ⌜∧⌝
+    | "||" ^^^ ⌜∨⌝
+    | "="  ^^^ ⌜≈⌝
+    | "!=" ^^^ ⌜≠⌝
+  )
 
   lazy val int: Parser[String] = numericLit
 

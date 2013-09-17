@@ -1,0 +1,10 @@
+class A {}
+class B {}
+
+class Subtyping {
+  fields x: A;
+  methods
+  def Subtyping() = {
+    x := new B();
+  }
+}
