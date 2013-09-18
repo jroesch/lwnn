@@ -160,7 +160,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
 
-  def getAST(source: String): AST = {
+  def getAST(source: String): Either[String, AST] = {
     // strip out comments
     val commentR = """##((#?[^#]+)*)##""".r
     val cleanSource = commentR.replaceAllIn(source, "" )
@@ -171,15 +171,11 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
     // return result or a useful error message
     result match {
-      case Success(ast,_) =>
-        ast
-
-      case NoSuccess(msg,next) => {
-        println("Parse error: " + msg)
-        println("At line " + next.pos.line + ", column " + next.pos.column)
-        println(next.pos.longString)
-        sys.exit(1)
-      }
+      case Success(ast,_) => Right(ast)
+      case NoSuccess(msg,next) =>
+        Left(s"Parse error: $msg\n" +
+        s"At line: ${next.pos.line} column: ${next.pos.column}\n" +
+        next.pos.longString)
     }
   }
 

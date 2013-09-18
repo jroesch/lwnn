@@ -8,11 +8,14 @@ import java.nio.file.Files
 
 
 package object lwwn {
-  def pprint(t: AST) = (new cs260.lwnn.PrettyPrinter(t)).print
+  def pprint(t: AST) = println((new cs260.lwnn.PrettyPrinter(t)).print)
 
   def main(args: Array[String]) = args.foreach { arg => 
-    val ast = getAST(fromFile(arg).mkString)
-    typecheck(ast)
-    println(pprint(ast))
+    getAST(fromFile(arg).mkString) match {
+      case Left(err) => println(err)
+      case Right(ast) =>
+        typecheck(ast)
+        pprint(ast)
+    }
   }
 }
