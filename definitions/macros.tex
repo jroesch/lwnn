@@ -1,0 +1,181 @@
+%% math style columns for tables
+\newcolumntype{R}{>{$}r<{$}}
+\newcolumntype{L}{>{$}l<{$}}
+\newcolumntype{C}{>{$}c<{$}}
+
+%% misc
+\newcommand{\alt}{\ \mid\ }
+\newcommand{\lalt}{\ \ \ \alt}
+\newcommand{\anywhere}[1]{\ensuremath{\mbox{#1}}}
+\newcommand{\kw}[1]{\anywhere{\sffamily{\bfseries\small {#1}}}}
+\newcommand{\ignore}[1]{}
+\newcommand{\vsp}{\vspace{.1in}}
+\newcommand{\nvsp}{\vspace{-.1in}}
+\newcommand{\mtt}[1]{\ensuremath{\mathit{#1}}}
+\newcommand{\mrm}[1]{\ensuremath{\mathrm{#1}}}
+\newcommand{\ttt}[1]{\ensuremath{\mbox{\small \texttt{#1}}}}
+\newcommand{\red}[1]{{\color{red}{#1}}}
+\newcommand{\blue}[1]{{\color{blue}{#1}}}
+\newcommand{\green}[1]{{\color{green}{#1}}}
+\newcommand{\note}[1]{\red{\textbf{[#1]}}}
+\newcommand{\something}{\ensuremath{\,\cdot\,}}
+
+%% math
+\newcommand{\seq}[2][]{\ensuremath{\vec{#2}}\xspace}
+\newcommand{\wseq}[2][]{\ensuremath{\overrightarrow{#2}}\xspace}
+\newcommand{\uset}[1]{\ensuremath{\overline{#1}}\xspace}
+\newcommand{\power}{\mathcal{P}\xspace}
+\newcommand{\proj}[2]{\ensuremath{\pi_{#1}(#2)}\xspace}
+\newcommand{\nada}{\ensuremath{\bullet}\xspace}
+\newcommand{\sopt}[1]{#1^?\xspace}
+\newcommand{\sseq}[1]{#1^\star\xspace}
+\newcommand{\sseqp}[1]{#1^+\xspace}
+\newcommand{\fold}{\ttt{foldl}\xspace}
+\newcommand{\lte}{\ensuremath{\sqsubseteq}\xspace}
+\newcommand{\gte}{\ensuremath{\sqsupseteq}}
+
+%% types
+\newcommand{\intt}{\ttt{int}\xspace}
+\newcommand{\boolt}{\ttt{bool}\xspace}
+\newcommand{\strt}{\ttt{string}\xspace}
+\newcommand{\nullt}{\ttt{null}\xspace}
+\newcommand{\TopClass}{\ttt{TopClass}\xspace}
+
+%% syntactic domains
+\newcommand{\Int}{\ensuremath{\mathbb{Z}}\xspace}
+\newcommand{\Nat}{\ensuremath{\mathbb{N}}\xspace}
+\newcommand{\Bool}{\mtt{Bool}\xspace}
+\newcommand{\String}{\mtt{String}\xspace}
+\newcommand{\Variable}{\mtt{Variable}\xspace}
+\newcommand{\BinOp}{\mtt{BinaryOp}\xspace}
+\newcommand{\Exp}{\mtt{Exp}\xspace}
+\newcommand{\Stmt}{\mtt{Stmt}\xspace}
+\newcommand{\Program}{\mtt{Program}\xspace}
+\newcommand{\Method}{\mtt{Method}\xspace}
+\newcommand{\Class}{\mtt{Class}\xspace}
+\newcommand{\Type}{\mtt{Type}\xspace}
+\newcommand{\CName}{\mtt{ClassName}\xspace}
+\newcommand{\MName}{\mtt{MethodName}\xspace}
+
+%% syntactic metavariables and terms
+\newcommand{\str}{\mtt{str}\xspace}
+\newcommand{\class}{\mtt{class}\xspace}
+\newcommand{\true}{\kw{true}\xspace}
+\newcommand{\false}{\kw{false}\xspace}
+\newcommand{\self}{\ttt{self}\xspace}
+\newcommand{\stmt}{\mtt{s}\xspace}
+\newcommand{\typ}{\ensuremath{\tau}}
+\newcommand{\cname}{\mtt{cn}\xspace}
+\newcommand{\mname}{\mtt{mn}\xspace}
+\newcommand{\binop}{\ensuremath{\oplus}\xspace}
+\newcommand{\cond}[3]{\ensuremath{\kw{if }#1\; #2 \kw{ else } #3}\xspace}
+\newcommand{\while}[2]{\ensuremath{\kw{while }#1\; #2}\xspace}
+\newcommand{\nullv}{\kw{null}\xspace}
+
+%% concrete semantic domain
+\newcommand{\Heap}{\mtt{Heap}\xspace}
+\newcommand{\Local}{\mtt{Locals}\xspace}
+\newcommand{\Value}{\mtt{Value}\xspace}
+\newcommand{\Address}{\mtt{Address}\xspace}
+\newcommand{\State}{\mtt{State}\xspace}
+\newcommand{\Kont}{\mtt{Kont}\xspace}
+\newcommand{\Classes}{\mtt{ClassDefs}\xspace}
+\newcommand{\Object}{\mtt{Object}\xspace}
+\newcommand{\Ref}{\ensuremath{\mtt{Reference}}\xspace}
+
+%% concrete semantic objects
+\newcommand{\state}{\ensuremath{\varsigma}\xspace}
+\newcommand{\local}{\ensuremath{\rho}\xspace}
+\newcommand{\heap}{\ensuremath{\sigma}\xspace}
+\newcommand{\dom}{\ensuremath{\ttt{dom}}\xspace}
+\newcommand{\alloc}{\ensuremath{\ttt{alloc}}\xspace}
+\newcommand{\eeval}{\ensuremath{\eta}\xspace}
+\newcommand{\evalTo}[1]{\ensuremath{\llbracket #1 \rrbracket}\xspace}
+\newcommand{\step}{\ensuremath{\mathcal{F}}\xspace}
+\newcommand{\classes}{\ensuremath{\theta}\xspace}
+\newcommand{\kont}{\kappa\xspace}
+\newcommand{\sstmtk}[1]{\kw{stmtK}\;#1\xspace}
+\newcommand{\swhilek}[2]{\kw{whileK}\;#1 \times #2\xspace}
+\newcommand{\sretk}[3]{\kw{retK}\;#1 \times #2 \times #3\xspace}
+\newcommand{\stmtk}[1]{\kw{stmtK}(#1)\xspace}
+\newcommand{\whilek}[2]{\kw{whileK}(#1,\, #2)\xspace}
+\newcommand{\retk}[3]{\kw{retK}(#1,\, #2,\, #3)\xspace}
+
+%% concrete helper functions
+\newcommand{\tostmtk}{\ttt{toSK}\xspace}
+\newcommand{\funcall}{\ttt{call}\xspace}
+\newcommand{\construct}{\ttt{construct}\xspace}
+\newcommand{\initstate}{\ttt{initstate}\xspace}
+\newcommand{\initclass}{\ttt{initclass}\xspace}
+\newcommand{\defval}{\ttt{defaultvalue}\xspace}
+\newcommand{\head}{\ttt{head}\xspace}
+
+%% abstract semantic domain
+\newcommand{\AInt}{\ensuremath{\Int^\sharp}\xspace}
+\newcommand{\ABool}{\ensuremath{\Bool^\sharp}\xspace}
+\newcommand{\AString}{\ensuremath{\String^\sharp}\xspace}
+\newcommand{\ABinOp}{\ensuremath{\mtt{BinaryOp}^\sharp}\xspace}
+\newcommand{\AHeap}{\ensuremath{\mtt{Heap}^\sharp}\xspace}
+\newcommand{\ALocal}{\ensuremath{\mtt{Locals}^\sharp}\xspace}
+\newcommand{\AValue}{\ensuremath{\mtt{Value}^\sharp}\xspace}
+\newcommand{\AAddress}{\ensuremath{\mtt{Address}^\sharp}\xspace}
+\newcommand{\AState}{\ensuremath{\mtt{State}^\sharp}\xspace}
+\newcommand{\AKont}{\ensuremath{\mtt{Kont}^\sharp}\xspace}
+\newcommand{\AClasses}{\ensuremath{\mtt{ClassDefs}^\sharp}\xspace}
+\newcommand{\AObject}{\ensuremath{\mtt{Object}^\sharp}\xspace}
+\newcommand{\ARef}{\ensuremath{\mtt{Reference}^\sharp}\xspace}
+
+%% abstract semantic objects
+\newcommand{\astate}{\ensuremath{\hat{\state}}\xspace}
+\newcommand{\alocal}{\ensuremath{\hat{\local}}\xspace}
+\newcommand{\aheap}{\ensuremath{\hat{\heap}}\xspace}
+\newcommand{\aalloc}{\ensuremath{\widehat{\alloc}}\xspace}
+\newcommand{\aeeval}{\ensuremath{\eeval}^\sharp\xspace}
+\newcommand{\aevalTo}[1]{\ensuremath{\llbracket #1 \rrbracket^\sharp}\xspace}
+\newcommand{\astep}{\ensuremath{\hat{\step}}\xspace}
+\newcommand{\aclasses}{\ensuremath{\hat{\classes}}\xspace}
+\newcommand{\akont}{\ensuremath{\hat{\kont}}\xspace}
+\newcommand{\asstmtk}[1]{\widehat{\kw{stmtK}}\;#1\xspace}
+\newcommand{\aswhilek}[2]{\widehat{\kw{whileK}}\;#1 \times #2\xspace}
+\newcommand{\asretk}[3]{\widehat{\kw{retK}}\;#1 \times #2 \times #3\xspace}
+\newcommand{\asfink}{\widehat{\kw{finK}}\xspace}
+\newcommand{\astmtk}[1]{\widehat{\kw{stmtK}}(#1)\xspace}
+\newcommand{\awhilek}[2]{\widehat{\kw{whileK}}(#1,\, #2)\xspace}
+\newcommand{\aretk}[3]{\widehat{\kw{retK}}(#1,\, #2,\, #3)\xspace}
+\newcommand{\afink}{\widehat{\kw{finK}}\xspace}
+\newcommand{\av}{\ensuremath{\hat{v}}\xspace}
+\newcommand{\ao}{\ensuremath{\hat{o}}\xspace}
+\newcommand{\aad}{\ensuremath{\hat{a}}\xspace}
+\newcommand{\anullv}{\ensuremath{\widehat{\kw{null}}}\xspace}
+\newcommand{\an}{\ensuremath{\hat{n}}\xspace}
+\newcommand{\ab}{\ensuremath{\hat{b}}\xspace}
+\newcommand{\astr}{\ensuremath{\widehat{\mtt{str}}}\xspace}
+\newcommand{\abinop}{\ensuremath{\hat{\oplus}}\xspace}
+\newcommand{\aref}{\ensuremath{\hat{r}}}
+
+%% abstract helper functions
+\newcommand{\atostmtk}{\ensuremath{\ttt{toSK}^\sharp}\xspace}
+\newcommand{\afuncall}{\ensuremath{\ttt{call}^\sharp}\xspace}
+\newcommand{\aconstruct}{\ensuremath{\ttt{construct}^\sharp}\xspace}
+\newcommand{\ainitstate}{\ensuremath{\ttt{initstate}^\sharp}\xspace}
+\newcommand{\ainitclass}{\ensuremath{\ttt{initclass}^\sharp}\xspace}
+\newcommand{\adefval}{\ensuremath{\ttt{defaultvalue}^\sharp}\xspace}
+\newcommand{\aupdate}{\ensuremath{\ttt{update}^\sharp}\xspace}
+\newcommand{\alookup}{\ensuremath{\ttt{lookup}^\sharp}\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ignore{
+  \newcommand{\aeeval}{\ensuremath{\eta^\sharp}\xspace}
+  \newcommand{\dc}{\ensuremath{\underline{\;\;}}\xspace}
+  \newcommand{\yield}[1]{\ensuremath{\!\!\downharpoonright_{#1}}}
+  \newcommand{\pto}{\mat{\rightharpoonup}}
+  \newcommand{\bigjoin}{\mat{\bigsqcup}}
+  \newcommand{\lte}{\mat{\sqsubseteq}\xspace}
+  \newcommand{\gte}{\mat{\sqsupseteq}}
+  \newcommand{\lattice}{\mat{\mathcal{L}}\xspace}
+  \newcommand{\alattice}{\mat{\lattice^\sharp}\xspace}
+  \newcommand{\widen}{\mat{\triangledown}\xspace}
+  \newcommand{\pre}{\mat{\preceq}}
+  \newcommand{\sube}{\mat{\subseteq}}
+}

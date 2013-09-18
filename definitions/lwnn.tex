@@ -1,0 +1,945 @@
+\documentclass[10pt]{article}
+\usepackage[cm]{fullpage}
+\usepackage{pdflscape}
+\usepackage{longtable}
+\usepackage{bcprules}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{xspace}
+\usepackage{xargs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{stmaryrd}
+\usepackage[figuresleft]{rotating}
+\usepackage{galois}
+\usepackage{array}
+\usepackage{mdframed}
+\usepackage{bm}
+\usepackage{txfonts}
+
+\include{macros}
+
+\begin{document}
+
+\title{\textbf{\textsf{Lwnn}} Concrete and Abstract Semantics}
+\author{CS 260, Fall 2013}
+\date{}
+
+\maketitle
+
+\section{Lwnn Abstract Syntax}
+
+\begin{gather*}
+  n \in \Int \qquad b \in \Bool \qquad \str \in \String \qquad
+  x \in \Variable 
+  \\ 
+  \cname \in \CName \qquad \mname \in \MName
+\end{gather*}
+
+\nvsp\nvsp
+
+\begin{align*}
+  p \in \Program &\Coloneqq \wseq{\class}
+  \\%[.1in]
+  \class \in \Class &\Coloneqq \kw{class } \cname_1 \kw{ extends }
+  \cname_2 \;\left\{\; \kw{fields }\wseq{x : \typ} \;\cdot\; \kw{methods
+  }\wseq{m} \;\right\} 
+  \\%[.1in]
+  \typ \in \Type &\Coloneqq \intt \alt \boolt \alt \strt \alt \nullt
+  \alt \cname
+  \\%[.1in]
+  m \in \Method &\Coloneqq \kw{def }\mname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \left\{\; \seq{\stmt} \cdot \kw{return }e \;\right\}
+  \\%[.1in]
+  \stmt \in \Stmt &\Coloneqq x := e \alt e_1.x := e_2 \alt x :=
+  e.\mname(\seq{e}) \alt x := \kw{new }\cname(\seq{e})
+  \\
+  &\lalt \cond{e}{\wseq{\stmt_1}}{\wseq{\stmt_2}} \alt
+  \while{e}{\seq{\stmt}}
+  \\%[.1in]
+  e \in \Exp &\Coloneqq \uset{n} \alt \uset{b} \alt \uset{\str} \alt \nullv
+  \alt x \alt e.x \alt e_1 \binop e_2 
+  \\%[.1in]
+  \binop \in \BinOp &\Coloneqq + \alt - \alt \times \alt \div \alt < \alt
+  \leq \alt \land \alt \lor \alt = \alt \neq
+\end{align*}
+
+\paragraph{Notation.} By abuse of notation we use the vector notation
+\wseq{\something} to indicate an ordered sequence of unspecified size
+$n$, indexed from $0 \leq i < n$. We use the overline notation
+\uset{\something} to indicate an unordered set. The length of a vector
+(respectively, set) is denoted by $|\wseq{\something}|$ (respectively,
+$|\uset{\something}|$).
+
+\paragraph{Syntax Summary.} A \textit{program} consists of a sequence of
+classes. A \textit{class} specifies a name, a superclass, a set of
+fields (each field consisting of a variable and its type), and a set
+of methods. \textit{Types} represent integers, booleans, strings,
+\kw{null}, or one of the user-defined classes, respectively (i.e., the
+\nullt type has a single value, called \kw{null}). A \textit{method}
+specifies a name, a set of parameters (each consisting of a variable
+and its type), a return type, and a body. The body of a method is a
+sequence of statements terminated by a \kw{return} statement. A
+\textit{statement} is an assignment, an object field update, an object
+method call, new object construction, a conditional, or a while
+loop. An \textit{expression} is a set of integers, a set of booleans,
+a set of strings, the \kw{null} value, a variable, an object field
+access, or a binary operation. We use sets of integers, booleans, and
+strings to allow for nondeterministic execution without needing to
+specify I/O for the language.
+
+\paragraph{Type System.} The language is statically typed, using a
+nominal type system with subtyping and recursive types. The \intt,
+\boolt, and \strt types are invariant. The \nullt type is a subtype of
+all classes. All classes are subtypes of a builtin class called
+\TopClass that has no fields or methods. Every type has a default
+value of that type, which is used to initialize object fields and any
+method parameters that don't receive an argument. The default value of
+\intt is 0; the default value of \boolt is \false; the default value
+of \strt is \ttt{""}; the default value of \nullt and all class types
+is \kw{null}.
+
+\paragraph{Assumptions.} All methods implicitly have a parameter
+\self, which contains the address of the object that the method was
+called on (i.e., the \ttt{this} parameter in C++ and Java). Method
+calls can provide fewer arguments than there are parameters; the extra
+parameters are given default values (this is how methods can declare
+local variables). All classes contain a constructor method, defined as
+a method with the same name as that class; this method is called
+whenever an object of that class is created using \kw{new}. All
+constructors should end with $\kw{return }\self$. When a program is
+executed, it takes the first class in the program and calls its
+constructor as the entry point to the program. In the sequence of
+class definitions, a superclass must be defined before any class that
+inherits from it.
+
+\paragraph{Concrete Syntax.} The concrete syntax allows various
+shortcuts by making some parts of the syntax optional. If these
+optional parts are left out, the parser will fill them in with default
+syntax to match the required abstract syntax. In particular:
+
+\begin{itemize}
+\item A class doesn't need to declare any fields or methods; if they
+  are left out then the corresponding part of the abstract syntax will
+  be the empty set.
+
+\item A class doesn't need to specify a superclass using \kw{extend};
+  if this is left out then in the abstract syntax the class will
+  extend \TopClass.
+
+\item A method doesn't need to end with a \kw{return}; if this is left
+  out the abstract syntax will use $\kw{return }\self$.
+
+\item If a method doesn't syntactically contain a \kw{return}, it
+  doesn't need to specify the method's return type. The return type
+  will be inferred in the abstract syntax to be the method's
+  containing class.
+
+\item A method call doesn't need to assign the result to a
+  variable. If there is no assignment, the abstract syntax will assign
+  the return value to a dummy variable.
+
+\item An \kw{if} statement doesn't need to have an \kw{else}
+  clause. If it is left out, the abstract syntax will contain an
+  \kw{else} clause with a single statement that effectively is a
+  no-op.
+\end{itemize}
+
+\pagebreak
+
+\section{Lwnn Concrete Semantics}
+
+We describe the semantic domains that constitute a state of the
+transition system (Section~\ref{ssec:cdomains}), state transition
+rules (Section~\ref{ssec:crules}), and the helper functions used by
+the transition rules (Section~\ref{ssec:chelpers}).
+
+\subsection{Concrete Semantic Domains}
+\label{ssec:cdomains}
+
+\begin{align*}
+  \state \in \State &= \Classes \times \sopt{\Stmt} \times \Local \times
+  \Heap \times \sseq{\Kont}
+  \\
+  \classes \in \Classes &= \CName \to ((\Variable \to \Value) \times
+  (\MName \to \Method))
+  \\
+  \local \in \Local &= \Variable \to \Value
+  \\
+  \heap \in \Heap &= \Address \to \Object
+  \\
+  r \in \Ref &= \Address \,\uplus\, \left\{\nullv\right\}
+  \\
+  v \in \Value &= \Int \,\uplus\, \Bool \,\uplus\, \String \,\uplus\,
+  \Ref
+  \\
+  a \in \Address &= \Nat
+  \\
+  o \in \Object &= \CName \times (\Variable \to \Value)
+  \\
+  \kont \in \Kont &= \sstmtk{\Stmt} \;\uplus\; \swhilek{\Exp}{\sseq{\Stmt}}
+  \;\uplus\; \sretk{\Variable}{\Exp}{\Local}
+\end{align*}
+
+\paragraph{Notation.} We borrow notation from formal languages:
+$\something^?$ means 0 or 1 instances; $\something^\star$ means an ordered
+sequence of 0 or more instances; $\something^+$ means an ordered sequence
+of 1 or more instances. The $\uplus$ operator means disjoint union.
+
+\paragraph{Domains Summary.} A state consists of the class definitions
+(which are invariant across all states), an optional statement to be
+processed, a map from the current method's local variables to their
+values, a heap mapping addresses to objects, and a continuation
+stack. The class definitions map each class name to a pair of maps;
+the first maps the class's fields to their default values, and the
+second maps the class's method names to the method
+definitions. Language values are integers, booleans, strings, object
+references. An object reference is either an address or \kw{null}. An
+object is a tuple of the object's class name and a map from the class
+field's to their values for this object. The continuation stack is a
+sequence of \kw{stmtK} continuations (holding statements to be
+processed), \kw{whileK} continuations (holding the guard and body of a
+currently executing while loop, so we can start the next iteration),
+and \kw{retK} continuations (holding the variable to receive the
+callee method's return value, the expression whose value should be
+returned from the callee, and the caller method's local variables so
+that we can restore them when the callee returns).
+
+\subsection{Concrete Transition Rules}
+\label{ssec:crules}
+
+\begin{longtable}{R|L|L|C|C|C|L}
+  \caption{The concrete transition relation. Each rule describes how
+    to take one concrete state $(\classes, \sopt{\stmt}, \local,
+    \heap, \kont \cdot \wseq{\kont_1})$ to the next concrete state
+    $(\classes, \sopt{\stmt}_{\mtt{new}}, \local_{\mtt{new}},
+    \heap_{\mtt{new}}, \wseq{\kont_\mtt{new}})$. The
+    $\sopt{s}$ notation means a statement may or may not exist; we use
+    $\nada$ to indicate that there is no statement. The $\cdot$
+    operator used for the continuation stack indicates appending
+    sequences; thus $\kont$ is the top of the continuation stack in
+    the source state and $\wseq{\kont_1}$ is the rest of that
+    continuation stack.}
+  \\ \hline
+  \mtt{no.} & \sopt{\stmt} & \textbf{premises} & \sopt{\stmt}_{\mtt{new}} &
+  \local_{\mtt{new}} & \heap_{\mtt{new}} & \wseq{\kont_\mtt{new}}
+  \\ \hline
+  1 & x := e & \evalTo{e} = v & \nada & \local[x \mapsto v] & \heap &
+  \wseq{\kont_1}
+  \\
+  2 & e_1.x := e_2 & \evalTo{e_1} = a,\, \evalTo{e_2} = v,\; o =
+  \heap(a)[x \mapsto v] & \nada & \local & \heap[a \mapsto o] &
+  \wseq{\kont_1} 
+  \\
+  3 & x := e.\mname(\seq{e}) & \left(\local_1,
+  \wseq{\kont_2}\right) = \funcall\left(\classes, x, \evalTo{e},
+  \heap, \mname, \wseq{\evalTo{e}}, \local\right) & \nada & \local_1 &
+  \heap & \wseq{\kont_2} \cdot \wseq{\kont_1} 
+  \\
+  4 & x := \kw{new }\cname(\seq{e}) & \left(\local_1, \heap_1,
+  \wseq{\kont_2}\right) = \construct\left(\classes, x, \cname,
+  \wseq{\evalTo{e}}, \local, \heap\right) & \nada & \local_1 & \heap_1 &
+  \wseq{\kont_2} \cdot \wseq{\kont_1} 
+  \\
+  5 & \cond{e}{\wseq{\stmt_1}}{\wseq{\stmt_2}} & \evalTo{e} = \true &
+  \nada & \local & \heap & \tostmtk(\wseq{\stmt_1}) \cdot \wseq{\kont_1} 
+  \\
+  6 & \cond{e}{\wseq{\stmt_1}}{\wseq{\stmt_2}} & \evalTo{e} = \false &
+  \nada & \local & \heap & \tostmtk(\wseq{\stmt_2}) \cdot \wseq{\kont_1} 
+  \\
+  7 & \while{e}{\seq{\stmt}} & \evalTo{e} = \true & \nada & \local &
+  \heap & \tostmtk(\seq{\stmt}) \cdot \kont \cdot \wseq{\kont_1} 
+  \\
+  8 & \while{e}{\seq{\stmt}} & \evalTo{e} = \false & \nada & \local &
+  \heap & \wseq{\kont_1} 
+  \\
+  9 & \nada & \kont = \retk{x}{e}{\local_1},\, \evalTo{e} = v &
+  \nada & \local_1[x \mapsto v] & \heap & \wseq{\kont_1} 
+  \\
+  10 & \nada & \kont = \stmtk{\stmt_1} & \stmt_1 & \local & \heap &
+  \wseq{\kont_1}  
+  \\
+  11 & \nada & \kont = \whilek{e}{\seq{\stmt}},\, \evalTo{e} = \true
+  & \nada & \local & \heap & \tostmtk(\seq{\stmt}) \cdot \kont \cdot
+  \wseq{\kont_1}  
+  \\
+  12 & \nada & \kont = \whilek{e}{\seq{\stmt}},\, \evalTo{e} = \false
+  & \nada & \local & \heap & \wseq{\kont_1} 
+\end{longtable}
+
+\paragraph{Notation.} We use \evalTo{e} as shorthand for $\eeval(e,
+\local, \heap)$ when \local and \heap are obvious from context. We use
+$\sopt{s}$ to indicate 0 or 1 statements; \nada means there is no
+statement. For any map $X$, the notation $X[a \mapsto b]$ means a new
+map that is exactly the same as $X$ except that $a$ maps to $b$. We
+abuse notation for objects by using this map update notation to update
+object fields in rule 2, even though technically objects are a pair of
+class name and a map. We use \proj{i}{\mtt{tuple}} to project out the
+$i$th element of \mtt{tuple}.
+
+\subsection{Concrete Helper Functions}
+\label{ssec:chelpers}
+
+We describe the helper functions used by the transition rules. The
+functions are listed in alphabetical order. Note that in several
+places we implictly assume that a reference value must be an address
+rather then \nullv; this means that the behavior if the reference is
+actually \nullv is undefined.
+
+\paragraph{Notation.}  The notation $\mtt{map_1}[\mtt{map_2}]$ is
+shorthand for updating $\mtt{map_1}$ with each entry in $\mtt{map_2}$
+in turn. Recall that we use \proj{i}{\mtt{tuple}} to project out the
+$i$th element of \mtt{tuple}.
+
+\subsubsection{\fbox{$\eeval(e, \local, \heap)$\ \  a.k.a.\ \ \evalTo{e}}}
+
+This function describes how to evaluate expressions to values. Note
+that sets of integers/booleans/strings are evaluated by
+nondeterministically selecting an element from that set. Variables are
+looked up in the locals map; object field access gets the address of
+an object and then looks up the given field's value in that object;
+binary operators recursively evaluate the operands and then apply the
+appropriate operation to the result (the operators are described below).
+
+\nvsp
+\begin{flalign*}
+  \eeval : \Exp \times \Local \times \Heap \to \Value&&
+\end{flalign*}
+
+\nvsp\nvsp\nvsp\nvsp
+
+\begin{flalign*}
+  \eeval(e, \local, \heap) &=&
+  \\
+  &\quad
+  \begin{cases}
+    n &\text{if }e = \uset{n},\, n \in \uset{n}
+    \\
+    b &\text{if }e = \uset{b},\, b \in \uset{b}
+    \\
+    \str &\text{if }e = \uset{\str},\, \str \in \uset{\str}
+    \\
+    \nullv &\text{if }e = \nullv
+    \\
+    \local(x) &\text{if }e = x
+    \\
+    \mtt{fields}(x) &\text{if }e = e_1.x,\, \evalTo{e_1} = a,\,
+    \proj{2}{\heap(a)} = \mtt{fields}
+    \\
+    \evalTo{e_1} \binop \evalTo{e_2} &\text{if }e = e_1 \binop e_2
+  \end{cases}
+\end{flalign*}
+
+\paragraph{Operators on Integers.}
+$\{+, -, \times, \div\} : \Int \times \Int \to \Int$ are the standard
+(unbounded width) integer arithmetic operators.
+
+\paragraph{Operators on Booleans.}
+$\{\land, \lor\} : \Bool \times \Bool \to \Bool$ are the standard
+logical \textsc{and} and \textsc{or} operators.
+
+\paragraph{Operators and Strings.}
+$+ : \String \times \String \to \String$ is string
+concatenation. $\{<, \leq\} : \String \times \String \to \Bool$ are
+strict and reflexive lexicographic string comparison, respectively.
+
+\paragraph{Operators on Values.}
+$\{=, \neq\} : \Value \times \Value \to \Bool$ are equality and
+inequality of values, respectively.
+
+\subsubsection{\fbox{\funcall}}
+
+This function describes how to process a method call. Note that the
+current locals map is saved in the \kw{retK} continuation to be
+restored once the callee returns, and that \self is mapped to the
+object's address in the new locals map. Any arguments are copied to
+their respective parameters; any parameters not given an argument are
+mapped to their type's default value.
+
+\nvsp
+\begin{flalign*}
+  &\funcall \in \Classes \times \Variable \times \Address \times
+  \Heap \times \MName \times \sseq{\Value} \times \Local \to \Local
+  \times \sseq{\Kont}&
+  \\
+  &\funcall\left(\classes, x, a, \heap, \mname, \seq{v}, \local\right) =
+  \left(\local_1, \wseq{\kont_1}\right) \qquad\text{where}&
+  \\
+  &\qquad\cname = \proj{1}{\heap(a)}
+  \\
+  &\qquad\mtt{methods} = \proj{2}{\classes(\cname)}
+  \\
+  &\qquad\mtt{methods}(\mname) = \kw{def }\mname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \{\; \seq{\stmt} \cdot \kw{return }e \;\}
+  \\
+  &\qquad\wseq{\kont_1} = \tostmtk(\seq{\stmt}) \cdot
+  \retk{x}{e}{\local} 
+  \\
+  &\qquad \local_1 = [\self \mapsto a] \cup [\;x_i \mapsto v \alt 0
+    \leq i < |\seq{v}| \implies v = v_i,\; |\seq{v}| \leq i < |\wseq{x
+      : \typ}| \implies v = \defval(\typ_i)\;] 
+\end{flalign*}
+
+\subsubsection{\fbox{\construct}}
+
+This function describes how to create a new object. It retrieves the
+class's fields and their default values from the class definitions to
+create a new object, then allocates a fresh address and creates a new
+heap that maps the address to the new object. It then retrieves the
+constructor method for that class and proceeds as if for a method
+call. Note that since constructors must end in $\kw{return }\self$,
+$x$ will get the new object's address when the constructor returns.
+
+\nvsp
+\begin{flalign*}
+  &\construct \in \Classes \times \Variable \times \CName \times
+  \sseq{\Value} \times \Local \times \Heap \to \Local \times \Heap
+  \times \sseq{\Kont}&
+  \\
+  &\construct\left(\classes, x, \mname, \seq{v}, \local, \heap\right) = 
+  \left(\local_1, \heap_1, \wseq{\kont_1}\right) \qquad\text{where}&
+  \\
+  &\qquad a \text{ is a fresh address}
+  \\
+  &\qquad o = (\cname, \proj{1}{\classes(\cname)})
+  \\
+  &\qquad \heap_1 = \heap[a \mapsto o]
+  \\
+  &\qquad\mtt{methods} = \proj{2}{\classes(\cname)}
+  \\
+  &\qquad\mtt{methods}(\cname) = \kw{def }\cname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \{\; \seq{\stmt} \cdot \kw{return }\self \;\}
+  \\
+  &\qquad\wseq{\kont_1} = \tostmtk(\seq{\stmt}) \cdot
+  \retk{x}{\self}{\local} 
+  \\
+  &\qquad \local_1 = [\self \mapsto a] \cup [\;x_i \mapsto v \alt 0
+    \leq i < |\seq{v}| \implies v = v_i,\; |\seq{v}| \leq i < |\wseq{x
+    : \typ}| \implies v = \defval(\typ_i)\;] 
+\end{flalign*}
+
+\subsubsection{\fbox{\defval}}
+
+This function maps each type to that type's default value.
+
+\nvsp
+\begin{flalign*}
+  &\defval \in \Type \to \Value
+  \\
+  &\defval(\typ) =&
+  \\
+  &\quad
+  \begin{cases}
+    0 &\text{if }\typ = \intt
+    \\
+    \false &\text{if }\typ = \boolt
+    \\
+    \ttt{""} &\text{if }\typ = \strt
+    \\
+    \nullv &\text{otherwise}
+  \end{cases}
+\end{flalign*}
+
+\subsubsection{\fbox{\initstate}}
+
+This function takes the program and generates the initial state. It
+creates the class definitions and calls the constructor of the first
+class in the program as the starting point of the program's
+execution. It uses a secondary helper function \initclass to convert a
+syntactic class definition into a semantic class definition. \fold is
+the standard functional fold-left function that takes a function, an
+initial value, and a sequence and applies the function to each element
+of the sequence, passing the result of each function call to the next
+call in the chain.
+
+\nvsp
+\begin{flalign*}
+  &\initstate \in \Program \to \State
+  \\
+  &\initstate(p) = (\classes, \nada, \local, \heap, \seq{\kont})
+  \qquad\text{where}&
+  \\
+  &\qquad \classes = \fold(\; (\mtt{acc}, \class \Rightarrow
+  \mtt{acc} \cup [\class.\cname_1 \mapsto \initclass(\class)]),\;
+  [\TopClass \mapsto (\emptyset, \emptyset)],\; p)
+  \\
+  &\qquad \cname \text{ is the name of the first class in }p
+  \\
+  &\qquad a \text{ is a fresh address}
+  \\
+  &\qquad o = (\cname, \proj{1}{\classes(\cname)})
+  \\
+  &\qquad \heap = [a \mapsto o]
+  \\
+  &\qquad\mtt{methods} = \proj{2}{\classes(\cname)}
+  \\
+  &\qquad\mtt{methods}(\cname) = \kw{def }\cname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \{\; \seq{\stmt} \cdot \kw{return }\self \;\}
+  \\
+  &\qquad\seq{\kont} = \tostmtk(\seq{\stmt})
+  \\
+  &\qquad \local = [\self \mapsto a] \cup [\;x_i \mapsto
+    \defval(\typ_i) \alt 0 \leq i < |\wseq{x : \typ}| \;] 
+\end{flalign*}
+
+\nvsp\nvsp
+\begin{flalign*}
+  &\initclass \in \Classes \times \Class \to (\Variable \to \Value)
+  \times (\MName \to \Method)
+  \\
+  &\initclass(\classes, \class) = (\mtt{fields},\, \mtt{methods})
+  \qquad\text{where}&
+  \\
+  &\qquad \class = \kw{class } \cname_1 \kw{ extends } \cname_2 \;\{\;
+  \kw{fields }\wseq{x : \typ} \;\cdot\; \kw{methods }\wseq{m} \;\}
+  \\
+  &\qquad \mtt{superflds} = \proj{1}{\classes(\cname_2)}
+  \\
+  &\qquad \mtt{supermethods} = \proj{2}{\classes(\cname_2)}
+  \\
+  &\qquad \mtt{localflds} = [\; x_i \mapsto \defval(\typ_i) \alt 0
+    \leq i < |\wseq{x : \typ}| \;]
+  \\
+  &\qquad \mtt{localmethods} = [\; m_j.\mname \mapsto m_j \alt 0 \leq
+    j < |\wseq{m}| \;]
+  \\
+  &\qquad \mtt{fields} = \mtt{superflds}[\mtt{localflds}]
+  \\
+  &\qquad \mtt{methods} = \mtt{supermethods}[\mtt{localmethods}]
+\end{flalign*}
+
+\subsubsection{\fbox{\tostmtk}}
+
+This function maps a sequence of statements to a sequence of
+\kw{stmtK} continuations containing those statements.
+
+\nvsp
+\begin{flalign*}
+  &\tostmtk \in \sseq{\Stmt} \to \sseq{\Kont}
+  \\
+  &\tostmtk(\seq{\stmt}) = \seq{\kont}
+  \qquad\text{where } \kont_i = \stmtk{\stmt_i} \text{ for }0 \leq i <
+  |\seq{\stmt}|&
+\end{flalign*}
+
+\pagebreak
+
+\section{Lwnn Abstract Semantics}
+
+We describe the semantic domains that constitute an abstract state
+(Section~\ref{ssec:adomains}), abstract state transition rules
+(Section~\ref{ssec:arules}), and the helper functions used by the
+abstract transition rules (Section~\ref{ssec:ahelpers}).
+
+\subsection{Abstract Semantic Domains}
+\label{ssec:adomains}
+
+\begin{gather*}
+  \an \in \AInt \qquad \ab \in \ABool \qquad \astr \in \AString \qquad
+  \aad \in \AAddress \qquad \abinop \in \ABinOp
+\end{gather*}
+
+\nvsp\nvsp
+\begin{align*}
+  \astate \in \AState &= \AClasses \times \sopt{\Stmt} \times \ALocal \times
+  \AHeap \times \sseq{\AKont\ \!} 
+  \\
+  \aclasses \in \AClasses &= \CName \to \left(\left(\Variable \to
+  \AValue\right) \times \left(\MName \to \Method\right)\right)
+  \\
+  \alocal \in \ALocal &= \left(\Variable \to \AValue\right) \times
+  \power\left(\sseq{\AKont\ \!}\right)
+  \\
+  \aheap \in \AHeap &= \AAddress \to \AObject
+  \\
+  \aref \in \ARef &= \power\left(\AAddress \cup \{ \nullv \}\right) 
+  \\
+  \av \in \AValue &= \AInt \,\uplus\, \ABool \,\uplus\, \AString \,\uplus\,
+  \ARef
+  \\
+  \ao \in \AObject &= \CName \times \left(\Variable \to \AValue\right)
+  \\
+  \akont \in \AKont &= \asstmtk{\Stmt} \;\uplus\; \aswhilek{\Exp}{\sseq{\Stmt}}
+  \;\uplus\; \asretk{\Variable}{\Exp}{\ALocal} \;\uplus\; \asfink
+\end{align*}
+
+\paragraph{Domains Summary.} We leave the abstract number, boolean,
+string, and address domains unspecified. The abstract boolean
+operators depend on the specific abstractions chosen for these
+domains. We augment the \ALocal domain to include a set of
+continuation stacks and add a semantic continuation $\asfink$; these
+are used to provide a level of indirection for handling method calls
+that is necessary for computability. An abstract reference is a set
+containing abstract addresses and/or \nullv---we do this because we
+are over-approximating the concrete semantics, in which an object
+reference would be only a single address or \nullv.
+
+\subsection{Abstract Transition Rules}
+\label{ssec:arules}
+
+\begin{longtable}{R|L|L|C|C|C|L}
+  \caption{The abstract transition relation. Each rule describes how
+    to take one abstract state $(\aclasses, \sopt{\stmt}, \alocal,
+    \aheap, \akont \cdot \wseq{\akont_1})$ to the next abstract state
+    $(\aclasses, \sopt{\stmt}_{\mtt{new}}, \alocal_{\mtt{new}},
+    \aheap_{\mtt{new}}, \wseq{\akont_\mtt{new}})$. The
+    $\sopt{s}$ notation means a statement may or may not exist; we use
+    $\nada$ to indicate that there is no statement. The $\cdot$ operator
+  used for the continuation stacks indicates appending sequences; thus
+  $\akont$ is the top of the continuation stack in the source state and
+  $\wseq{\akont_1}$ is the rest of that continuation stack.}
+  \\ \hline
+  \mtt{no.} & \sopt{\stmt} & \textbf{premises} & \sopt{\stmt}_{\mtt{new}} &
+  \alocal_{\mtt{new}} & \aheap_{\mtt{new}} & \wseq{\akont_\mtt{new}}
+  \\ \hline
+  1 & x := e & \aevalTo{e} = \av & \nada & \alocal[x \mapsto \av] &
+  \aheap & \wseq{\akont_1} 
+  \\
+  2 & e_1.x := e_2 & \aheap_1 = \aupdate(\aheap, \aevalTo{e_1}, x,
+  \aevalTo{e_2}) & \nada & \alocal & \aheap_1 & \wseq{\akont_1} 
+  \\
+  3 & x := e.\mname(\seq{e}) & \left(\alocal_1, \wseq{\akont_2}\right) \in
+  \afuncall\left(\aclasses, x, \aevalTo{e}, \aheap,  \mname,
+  \wseq{\aevalTo{e}}, \alocal, \wseq{\akont_1} \right) & \nada &
+  \alocal_1 & \aheap & \wseq{\akont_2} 
+  \\
+  4 & x := \kw{new }\cname(\seq{e}) & \left(\alocal_1, \aheap_1,
+  \wseq{\akont_2}\right) = \aconstruct\left(\aclasses, x, \cname,
+  \wseq{\aevalTo{e}}, \alocal, \aheap, \wseq{\akont_1} \right) & \nada &
+  \alocal_1 & \aheap_1 & \wseq{\akont_2} 
+  \\
+  5 & \cond{e}{\wseq{\stmt_1}}{\wseq{\stmt_2}} & \true \in
+  \gamma_b(\aevalTo{e}) & \nada & \alocal & \aheap &
+  \atostmtk(\wseq{\stmt_1}) \cdot \wseq{\akont_1} 
+  \\
+  6 & \cond{e}{\wseq{\stmt_1}}{\wseq{\stmt_2}} & \false \in
+  \gamma_b(\aevalTo{e}) & \nada & \alocal & \aheap &
+  \atostmtk(\wseq{\stmt_2}) \cdot \wseq{\akont_1}  
+  \\
+  7 & \while{e}{\seq{\stmt}} & \true \in \gamma_b(\aevalTo{e}) &
+  \nada & \alocal & \aheap & \atostmtk(\seq{\stmt}) \cdot \akont
+  \cdot \wseq{\akont_1} 
+  \\
+  8 & \while{e}{\seq{\stmt}} & \false \in \gamma_b(\aevalTo{e}) &
+  \nada & \alocal & \aheap & \wseq{\akont_1} 
+  \\
+  9 & \nada & \akont = \afink,\, \aretk{x}{e}{\alocal_1} \cdot
+  \wseq{\akont_2} \in \proj{2}{\alocal},\, \aevalTo{e} = \av
+  & \nada & \alocal_1[x \mapsto \av] & \aheap & \wseq{\akont_2}
+  \\
+  10 & \nada & \akont = \astmtk{\stmt_1} & \stmt_1 & \alocal & \aheap &
+  \wseq{\akont_1}  
+  \\
+  11 & \nada & \akont = \awhilek{e}{\seq{\stmt}},\, \true \in
+  \gamma_b(\aevalTo{e}) & \nada & \alocal & \aheap &
+  \atostmtk(\seq{\stmt}) \cdot \akont \cdot \wseq{\akont_1} 
+  \\
+  12 & \nada & \akont = \awhilek{e}{\seq{\stmt}},\, \false \in
+  \gamma_b(\aevalTo{e}) & \nada & \alocal & \aheap & \wseq{\akont_1}
+\end{longtable}
+
+\paragraph{Transitions Summary.} Rules 5--8 and 11--12 use
+$\gamma_b$, the boolean concretization operator that maps an abstract
+boolean value to the corresponding set of concrete boolean values. In
+rules 2--3 the helper functions use the indirection provided by
+$\ALocal$ to store the current continuation stack inside the
+continuation stack set of $\alocal_1$ for a method/constructor call,
+and rule 9 restores the continuation stack from that set when
+returning from the callee.
+
+\subsection{Abstract Helper Functions}
+\label{ssec:ahelpers}
+
+We describe the helper functions used by the abstract transition
+rules. The functions are listed in alphabetical order. Note that in
+several places we implicitly ignore the possibility that an abstract
+reference value may contain \nullv; since these operations on \nullv
+are undefined in the concrete semantics, it is sound to ignore them in
+the abstract semantics.
+
+\subsubsection{\fbox{$\aeeval(e, \alocal, \aheap)$\ \  a.k.a.\ \ \aevalTo{e}}}
+
+This function describes how to evaluate expressions to abstract
+values. It uses the number abstaction function $\alpha_n$, the boolean
+abstraction function $\alpha_b$, the string abstraction function
+$\alpha_\str$, and the reference abstraction function
+$\alpha_r$. Field access uses the helper function \alookup. The
+abstract binary operators are left unspecified because they depend on
+the abstractions chosen for the abstract value domains.
+
+\nvsp
+\begin{flalign*}
+  \aeeval : \Exp \times \ALocal \times \AHeap \to \AValue&&
+\end{flalign*}
+
+\nvsp\nvsp\nvsp
+\begin{flalign*}
+  \aeeval(e, \alocal, \aheap) &=&
+  \\
+  &\quad
+  \begin{cases}
+    \an &\text{if }e = \uset{n},\, \alpha_n(\uset{n}) = \an
+    \\
+    \ab &\text{if }e = \uset{b},\, \alpha_b(\uset{b}) = \ab
+    \\
+    \astr &\text{if }e = \uset{\str},\, \alpha_\str(\uset{\str}) = \astr
+    \\
+    \alpha_r(\nullv) &\text{if }e = \nullv
+    \\
+    \alocal(x) &\text{if }e = x
+    \\
+    \alookup(\aevalTo{e_1}, x, \aheap) &\text{if }e = e_1.x
+    \\
+    \aevalTo{e_1} \;\abinop\; \aevalTo{e_2} &\text{if }e = e_1 \binop e_2
+  \end{cases}
+\end{flalign*}
+
+\subsubsection{\fbox{\afuncall}}
+
+This function describes how to abstractly process a method call. It
+returns a set of $(\ALocal, \sseq{\AKont\ \!})$ pairs because (due to
+inheritance and subtype polymorphism) there could be more than one
+possible method being called. The returned $\alocal_1$'s also contain
+the current continuation stack, which will be restored once the callee
+returns; this extra level of indirection is necessary for
+computability.
+
+\nvsp
+\begin{flalign*}
+  &\afuncall \in \AClasses \times \Variable \times \power(\AAddress)
+  \times \AHeap \times \MName \times \sseq{\AValue\ \!} \times \ALocal
+  \times \sseq{\AKont\ \!} \to \power(\ALocal \times \sseq{\AKont\ \!})&
+  \\
+  &\afuncall\left(\aclasses, x, \uset{\aad}, \aheap, \mname,
+  \seq{\av}, \alocal, \seq{\akont}\right) = \uset{\left(\alocal_1,
+    \wseq{\akont_1}\right)} \qquad\text{where}&
+  \\
+  &\qquad \uset{(\aad, \cname)} = \left\{\; (\aad,\,
+  \proj{1}{\heap(\aad)}) \alt \aad \in \uset{\aad} \;\right\}
+  \\
+  &\qquad \uset{(\aad, m)} = \left\{\; (\aad,\,
+  \proj{2}{\aclasses(\cname)}(\mname)) \alt (\aad, \cname) \in
+  \uset{(\aad, \cname)} \;\right\}
+  \\
+  &\qquad \uset{\left(\alocal_1, \wseq{\akont_1}\right)} = \left\{\;
+  \left(\alocal_{\aad}, \wseq{\akont_{\aad}}\right) \alt \left(\aad,\,
+  \kw{def }\mname(\wseq{x : \typ}) : \typ_{\mtt{ret}} \; \{\;
+  \seq{\stmt} \cdot \kw{return }e \;\}\right) \in \uset{(\aad, m)}
+  \;\right\} \qquad\text{where}
+  \\
+  &\qquad\qquad \alocal_{\aad} = \left([\self \mapsto \aad] \cup
+    [\;x_i \mapsto \av \alt 0 \leq i < |\seq{\av}| \implies \av =
+      \av_i,\; |\seq{\av}| \leq i < |\wseq{x : \typ}| \implies \av =
+      \adefval(\typ_i)\;],\; \left\{\,\aretk{x}{\self}{\alocal}
+      \cdot \seq{\akont}\,\right\}\right)
+  \\
+  &\qquad\qquad \wseq{\akont_{\aad}} = \atostmtk(\seq{\stmt}) \cdot \afink
+\end{flalign*}
+
+\subsubsection{\fbox{\aconstruct}}
+
+This function describes how to create a new abstract object. It leaves
+determination of the abstract address at which to allocate the object
+unspecified; this will depend on the heap model used by the
+analysis. That abstract address may be \textit{strong} (i.e.,
+correspond to a single concrete address) or \textit{weak} (otherwise);
+in the first case $\aheap_1$ is updated with the new object, in the
+second case $\aheap_1$ is updated with the join of the new object and
+any object currently allocated at that address---since the set of
+abstract addresses must be finite, the analysis may have to reuse the
+same abstract address for different objects. The $\gamma_a$ operator
+is the abstract address concretization operator; note that the
+\textit{implementation} of this helper function \textit{should not}
+actually use the concretization operator (which would be
+uncomputable).
+
+\nvsp
+\begin{flalign*}
+  &\aconstruct \in \AClasses \times \Variable \times \CName \times
+  \sseq{\AValue\ \!} \times \ALocal \times \AHeap \times
+  \sseq{\AKont\ \!} \to \ALocal \times \AHeap \times \sseq{\AKont\ \!}&
+  \\
+  &\aconstruct\left(\aclasses, x, \mname, \seq{\av}, \alocal, \aheap,
+  \seq{\akont}\right) = \left(\alocal_1, \aheap_1,
+  \wseq{\akont_1}\right) \qquad\text{where}& 
+  \\
+  &\qquad \aad \text{ depends on the heap model}
+  \\
+  &\qquad \ao = (\cname, \proj{1}{\aclasses(\cname)})
+  \\
+  &\qquad \aheap_1 = 
+  \begin{cases}
+    \aheap[\aad \mapsto \ao] & \text{if }|\gamma_a(\aad)| = 1
+    \\
+    \aheap[\aad \mapsto \ao \sqcup \aheap(\aad)] & \text{otherwise}
+  \end{cases}
+  \\
+  &\qquad\mtt{methods} = \proj{2}{\aclasses(\cname)}
+  \\
+  &\qquad\mtt{methods}(\cname) = \kw{def }\cname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \{\; \seq{\stmt} \cdot \kw{return }\self \;\}
+  \\
+  &\qquad\wseq{\akont_1} = \atostmtk(\seq{\stmt}) \cdot
+  \afink
+  \\
+  &\qquad \alocal_1 = \left([\self \mapsto \aad] \cup [\;x_i \mapsto
+    \av \alt 0 \leq i < |\seq{\av}| \implies \av = \av_i,\;
+    |\seq{\av}| \leq i < |\wseq{x : \typ}| \implies \av =
+    \adefval(\typ_i)\;],\; \left\{\,\aretk{x}{\self}{\alocal} \cdot
+  \seq{\akont}\,\right\}\right)
+\end{flalign*}
+
+\subsubsection{\fbox{\adefval}}
+
+This function maps each type to that type's default abstract value. It
+uses the number abstaction function $\alpha_n$, the boolean
+abstraction function $\alpha_b$, the string abstraction function
+$\alpha_\str$, and the reference abstraction function $\alpha_r$.
+
+\nvsp
+\begin{flalign*}
+  &\adefval \in \Type \to \AValue
+  \\
+  &\adefval(\typ) =&
+  \\
+  &\quad
+  \begin{cases}
+    \alpha_n(0) &\text{if }\typ = \intt
+    \\
+    \alpha_b(\false) &\text{if }\typ = \boolt
+    \\
+    \alpha_\str(\ttt{""}) &\text{if }\typ = \strt
+    \\
+    \alpha_r(\nullv) &\text{otherwise}
+  \end{cases}
+\end{flalign*}
+
+\subsubsection{\fbox{\ainitstate}}
+
+This function takes the program and generates the initial abstract
+state. It is similar to the concrete version except that it uses the
+corresponding abstractions of the concrete values.
+
+\nvsp
+\begin{flalign*}
+  &\ainitstate \in \Program \to \AState
+  \\
+  &\ainitstate(p) = \left(\aclasses, \nada, \alocal, \aheap,
+  \seq{\akont}\right) \qquad\text{where}&
+  \\
+  &\qquad \aclasses = \fold(\; (\mtt{acc}, \class \Rightarrow
+  \mtt{acc} \cup [\class.\cname_1 \mapsto \ainitclass(\class)]),\;
+  [\TopClass \mapsto (\emptyset, \emptyset)],\; p)
+  \\
+  &\qquad \cname \text{ is the name of the first class in }p
+  \\
+  &\qquad \aad \text{ is a fresh abstract address}
+  \\
+  &\qquad \ao = (\cname, \proj{1}{\aclasses(\cname)})
+  \\
+  &\qquad \aheap = [\aad \mapsto \ao]
+  \\
+  &\qquad\mtt{methods} = \proj{2}{\aclasses(\cname)}
+  \\
+  &\qquad\mtt{methods}(\cname) = \kw{def }\cname(\wseq{x : \typ}) :
+  \typ_{\mtt{ret}} \; \{\; \seq{\stmt} \cdot \kw{return }\self \;\}
+  \\
+  &\qquad\seq{\akont} = \atostmtk(\seq{\stmt})
+  \\
+  &\qquad \alocal = \left([\self \mapsto \aad] \cup [\;x_i \mapsto
+    \adefval(\typ_i) \alt 0 \leq i < |\wseq{x : \typ}| \;],\; \emptyset\right)
+\end{flalign*}
+
+\nvsp\nvsp
+\begin{flalign*}
+  &\ainitclass \in \AClasses \times \Class \to (\Variable \to \AValue)
+  \times (\MName \to \Method)
+  \\
+  &\ainitclass(\aclasses, \class) = (\mtt{fields},\, \mtt{methods})
+  \qquad\text{where}&
+  \\
+  &\qquad \class = \kw{class } \cname_1 \kw{ extends } \cname_2 \;\{\;
+  \kw{fields }\wseq{x : \typ} \;\cdot\; \kw{methods }\wseq{m} \;\}
+  \\
+  &\qquad \mtt{superflds} = \proj{1}{\classes(\cname_2)}
+  \\
+  &\qquad \mtt{supermethods} = \proj{2}{\classes(\cname_2)}
+  \\
+  &\qquad \mtt{localflds} = [\; x_i \mapsto \adefval(\typ_i) \alt 0
+    \leq i < |\wseq{x : \typ}| \;]
+  \\
+  &\qquad \mtt{localmethods} = [\; m_i.\mname \mapsto m_i \alt 0 \leq
+    i < |\wseq{m}| \;]
+  \\
+  &\qquad \mtt{fields} = \mtt{superflds}[\mtt{localflds}]
+  \\
+  &\qquad \mtt{methods} = \mtt{supermethods}[\mtt{localmethods}]
+\end{flalign*}
+
+\subsubsection{\fbox{\alookup}}
+
+This function takes a set of object addresses, an object field, and a
+heap, and returns the join of all the abstract values of that field in
+the objects at those addresses.
+
+\nvsp
+\begin{flalign*}
+  &\alookup \in \power(\AAddress) \times \Variable \times \AHeap \to
+  \AValue
+  \\
+  &\alookup\left(\uset{\aad}, x, \aheap\right) = \bigsqcup \left\{\;
+  \av \alt \aad \in \uset{\aad},\; \proj{2}{\aheap(\aad)}(x) = \av
+  \;\right\}& 
+\end{flalign*}
+
+\subsubsection{\fbox{\atostmtk}}
+
+This function maps a sequence of statements to a sequence of
+$\widehat{\kw{stmtK}}$ continuations containing those statements.
+
+\nvsp
+\begin{flalign*}
+  &\atostmtk \in \sseq{\Stmt} \to \sseq{\AKont\ \!}
+  \\
+  &\atostmtk(\seq{\stmt}) = \seq{\akont}
+  \qquad\text{where } \akont_i = \astmtk{\stmt_i} \text{ for }0 \leq i
+  < |\seq{\stmt}|&  
+\end{flalign*}
+
+\subsubsection{\fbox{\aupdate}}
+
+This function takes a set of object addresses, an object field, the
+new abstract value for that field, and a heap and returns an updated
+heap that has suitably updated the objects at those addresses. It
+performs a \textit{strong} or \textit{weak} update of those objects
+depending on if the given abstract addresses map to a single concrete
+address or not. The $\gamma_a$ operator is the abstract address
+concretization operator; note that the \textit{implementation} of this
+helper function \textit{should not} actually use the concretization
+operator (which would be uncomputable).
+
+\nvsp
+\begin{flalign*}
+  &\aupdate \in \AHeap \times \power(\AAddress) \times \Variable
+  \times \AValue \to \AHeap
+  \\
+  &\aupdate\left(\aheap, \uset{\aad}, x, \av\right) =&
+  \\
+  &\qquad 
+  \begin{cases}
+    \aheap[\aad \mapsto \ao[x \mapsto \av]]
+    &\text{if }\uset{\aad} = \{\aad\},\, |\gamma_a(\aad)| = 1,\,
+    \aheap(\aad) = \ao
+    \\
+    \aheap[\aad \mapsto \ao[x \mapsto \av \sqcup \proj{2}{\ao}(x)]] &
+    \text{otherwise, for }\aad \in \uset{\aad},\, \ao = \aheap(\aad)
+  \end{cases}
+\end{flalign*}
+
+\end{document}
