@@ -1,4 +1,4 @@
-\documentclass[nocopyrightspace,onecolumn]{sigplanconf}
+\documentclass[blockstyle]{sigplanconf}
 \usepackage{pdflscape}
 \usepackage{longtable}
 \usepackage{bcprules}
@@ -25,16 +25,72 @@
 \input{macros}
 \begin{document}
 
-\title{Explicitly Typed miniJS}
+\title{Lwnn Typing Rules}
 \authorinfo{}{}{}
 \date{}
 \maketitle
 
+\newcommand{\env}{\Gamma \vdash}
+\newcommand{\classK}{\textbf{class}}
+\newcommand{\extends}{\textbf{extends}}
+\newcommand{\intT}{int}
+\newcommand{\stringT}{string}
+\newcommand{\boolT}{bool}
+\newcommand{\nullT}{null}
+\newcommand{\fields}{\textbf{fields}}
+
 \section{Rules}
-\newcommand{\env}{rho}
+\subsection{Helpers}
+
+The ClassTable is adapted by the one described in FetherweightJava and is a mapping from class names to declarations,
+providing a mechanism for looking up class information. A program then is a pair (CT, e) we borrow their assumption and
+assume that the CT is fixed as well.
+
+method(m, C) = classTable.lookup(C).method(m)
+field(f, C) = classTable.lookup(C).field(f)
+
+\subsection{Subtyping}
+
+\infax
+{ A <: A }
+
+\infrule[Transitivity]
+{ C <: B \andalso B <: A}
+{ C  <: A }
+
+\infrule[Inheritance]
+{ \class\ C\ extends\ D\ \{ ... \} }
+{ C <: D \andalso \Gamma[ }
+
+\infax[T-Var]
+{\env x : \Gamma(x)}
+
+\infrule[T-Access]{}{}
+
+\infrule[T-Method-Invocation]
+{ \env e : C \andalso method(m, C) = \vec{D_i} \rightarrow \tau_r \andalso \env \vec{e_i} : \vec{\tau_i} \andalso \vec{\tau_i} <: \vec{D_i}}
+{\env e.m(\vec{e_i}) : \tau_r }
+\infax
+{ \env i : \intt }
+
+\infax
+{ \env \str: \strt }
+
+\infax
+{ \env \true: \boolt}
+
+\infax
+{ \env \false: \boolt }
+
+\infax
+{ \env  \nullv: \nullt }
 
 \infrule
-{ \env t_i : _i }
+{ \env } 
+{ \env \fields x_i : t_i }
+
+\infrule
+{ \env t_i : \classK T \extends S}
 { b }
 
 \end{document}
