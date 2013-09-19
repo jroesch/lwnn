@@ -4,17 +4,16 @@ import scala.io.Source.fromFile
 import lwnn.syntax._
 import cs260.lwnn.syntax.LwnnParser.getAST
 import cs260.lwnn.typechecker._
-import java.nio.file.Files
 
-
-package object lwwn {
+package object lwnn {
   def pprint(t: AST) = println((new cs260.lwnn.PrettyPrinter(t)).print)
 
   def main(args: Array[String]) = args.foreach { arg => 
     getAST(fromFile(arg).mkString) match {
       case Left(err) => println(err)
-      case Right(ast) =>
-        typecheck(ast)
+      case Right(program) =>
+        val (classTable, ast) = program
+        typecheck(ast, classTable)
         pprint(ast)
     }
   }

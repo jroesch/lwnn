@@ -42,13 +42,13 @@ case class Decl( x:Var, τ:Type ) extends AST
 
 sealed abstract class Type {
   // the subtyping operator (Scala won't allow the more usual <: notation)
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv): Boolean
-  def subtypeOf(t: Type)(implicit gamma: TypeEnv): Boolean = ⊑(t)
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable): Boolean
+  def subtypeOf(t: Type)(implicit classTable: ClassTable): Boolean = ⊑(t)
 }
 
 case object IntT extends Type {
   // IntT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
       case IntT ⇒ true
       case _ ⇒ false
@@ -57,7 +57,7 @@ case object IntT extends Type {
 
 case object BoolT extends Type {
   // BoolT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
       case BoolT ⇒ true
       case _ ⇒ false
@@ -66,7 +66,7 @@ case object BoolT extends Type {
 
 case object StrT extends Type {
   // StrT isn't a subtype of anything but itself
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
       case StrT ⇒ true
       case _ ⇒ false
@@ -75,7 +75,7 @@ case object StrT extends Type {
 
 case object NullT extends Type {
   // NullT is a subtype of itself and all classes
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) =
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
       case NullT | _:ClassT ⇒ true
       case _ ⇒ false
@@ -84,16 +84,16 @@ case object NullT extends Type {
 
 case class ClassT(cn: ClassName) extends Type {
   // the subtyping of classes depends on the user's program
-  def ⊑ ( τ:Type )(implicit gamma: TypeEnv) = τ match {
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) = τ match {
     case ClassT("TopClass") => true
     case ClassT(_) if cn == "TopClass" => false
     case o @ ClassT(on) =>
-      val tpe = gamma.classFor(this)
-      val other = gamma.classFor(o)
+      val tpe = classTable(this)
+      val other = classTable(o)
       println(tpe, other)
       if (tpe.selfType == other.selfType || tpe.superType == other.selfType)
         true
-      else ClassT(tpe.superType).subtypeOf(o)
+      else tpe.superType.subtypeOf(o)
     case _          => false
   }
 }
@@ -149,7 +149,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   type Parser[T] = PackratParser[T]
 
   var currentClass: Type = ClassT("TopClass")
-  val classes = MMap[ClassT, ClassTypes]()
+  val classTable = MMap[ClassT, ClassTableEntry](ClassT("TopClass") -> ClassTableEntry(Class("TopClass", null, Set(), Set())))
 
   // reserved keywords
   lexical.reserved ++= Seq("class", "extends", "fields", "methods",
@@ -160,7 +160,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
 
-  def getAST(source: String): Either[String, AST] = {
+  def getAST(source: String): Either[String, (ClassTable, AST)] = {
     // strip out comments
     val commentR = """##((#?[^#]+)*)##""".r
     val cleanSource = commentR.replaceAllIn(source, "" )
@@ -179,7 +179,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     }
   }
 
-  lazy val program: Parser[Program] = rep(classP) ^^ { cs => Program(cs) }
+  lazy val program: Parser[(ClassTable, Program)] = rep(classP) ^^ { cs =>
+    val classTable = for (c @ Class(name, _, _, _) <- cs) yield (ClassT(name), ClassTableEntry(c))
+    (ClassTable(Map(classTable: _*)), Program(cs))
+  }
 
   lazy val classP: Parser[Class] =
     "class" ~> classNameDef ~ opt("extends" ~> className) ~ "{" ~ classBody ~ "}" ^^ {

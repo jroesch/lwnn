@@ -6,8 +6,55 @@ import scala.collection.mutable.{ Map => MMap }
 case class Illtyped(msg: String) extends Exception(msg)
 
 object typechecker {
+  case class ClassTable(table: Map[Type, ClassTableEntry]) {
+    def apply(c: Type): ClassTableEntry = table get c match {
+      case Some(t) => t
+      case None => throw Illtyped(s"Class name $c is not declared.")
+    }
+
+    /* Field lookup that supports super classes. */
+    def field(t: Type, x: Var): Type = {
+      val clazz = apply(t)
+      clazz.field(x) match {
+        case Some(ft) => ft
+        case None if clazz.superType == "TopClass" =>
+          throw Illtyped(s"Class $t does not have a field $x.")
+        case None     => field(clazz.superType, x)
+      }
+    }
+
+    /* Method lookup that supports super classes. */
+    def method(t: Type, x: Var): MethodType = {
+      val clazz = apply(t)
+      clazz.method(x) match {
+        case Some(mt) => mt
+        case None if clazz.superType == "TopClass" =>
+          throw Illtyped(s"Class $t does not have a method $x.")
+        case None => method(clazz.superType, x)
+      }
+    }
+
+    /* Constructor for a class */
+    def constructor(t: Type): MethodType = {
+      val clazz = apply(t)
+      clazz.constructor match {
+        case Some(cons) => cons
+        case None if clazz.superType == "TopClass" =>
+          MethodType(t, Nil)
+        case None =>
+          val MethodType(_, argT) = constructor(clazz.superType)
+          MethodType(t, argT) /* downcast the constructor to the derived class */
+      }
+    }
+
+    /* Built-In types */
+    val builtins = Set[Type](BoolT, IntT, StrT, NullT)
+  }
+
+  case class MethodType(returnT: Type, argTs: Seq[Type])
+
   /* A helper container for types related to classes (constructor, field, method, super type) */
-  case class ClassTypes(clazz: Class) {
+  case class ClassTableEntry(clazz: Class) {
 
     val fieldTable = Map(
       (clazz match {
@@ -20,32 +67,29 @@ object typechecker {
       (clazz match {
         case Class(_, _, _, methods)  =>
           for (method <- methods) yield {
-            method.mn -> MethodType(method.τret, method.params.map { _.τ })
+            Var(method.mn) -> MethodType(method.τret, method.params.map { _.τ })
           }
       }).toSeq: _ *
     )
 
-    val constructor = methodTable.get(clazz.cn).
-      getOrElse(MethodType(ClassT(clazz.cn), Nil))
+    val constructor = methodTable.get(Var(clazz.cn))
 
-    case class MethodType(returnT: Type, argTs: Seq[Type])
+    def field(x: Var): Option[Type] =
+      fieldTable.get(x)
 
-    def field(x: Var) = fieldTable(x)
-    def method(x: Var) = methodTable(x.name)
-    def superType = clazz.supercn
-    def selfType  = clazz.cn
+    def method(x: Var): Option[MethodType] =
+      methodTable.get(x)
+
+    def superType = ClassT(clazz.supercn)
+    def selfType  = ClassT(clazz.cn)
   }
 
-  def typecheck(ast: AST): Type = {
-    val top = ClassTypes(Class("TopClass", null, Set(), Set()))
-    inScope(TypeEnv(Map(), MMap(ClassT("TopClass") -> top))).check(ast)
+  def typecheck(ast: AST, classTable: ClassTable): Type = {
+    inScope(TypeEnv(Map()))(classTable).check(ast)
   }
 
   // type environment
-  case class TypeEnv(env: Map[String, Type] = Map(), classTable: MMap[Type, ClassTypes] = MMap()) {
-    /* Built-In types */
-    val builtins = Set[Type](BoolT, IntT, StrT, NullT)
-
+  case class TypeEnv(env: Map[String, Type] = Map()) {
     def apply( x:String ): Type =
       env get x match {
         case Some(τ) ⇒ τ
@@ -54,20 +98,10 @@ object typechecker {
 
     /* Extend the environment leaving the mutable classTable the same */
     def ++( bindings:Seq[(String, Type)] ): TypeEnv =
-      TypeEnv(env ++ bindings, classTable)
-
-    /* A check if a type has been declared in the TypeEnv */
-    def isDeclared(t: Type): Boolean =
-      if (builtins.contains(t) || classTable.contains(t)) true else false
-
-    /* A helper for returning the ClassTypes object given a ClassT */
-    def classFor(c: Type): ClassTypes = classTable get c match {
-      case Some(t) => t
-      case None => throw Illtyped(s"Class name $c is not declared.")   }
+      TypeEnv(env ++ bindings)
   }
 
-  case class inScope(ρ: TypeEnv) {
-    implicit val env = ρ
+  case class inScope(ρ: TypeEnv)(implicit classTable: ClassTable) {
 
     def formatType(t: Type) = t match {
       case ClassT(cn) => cn
@@ -83,14 +117,7 @@ object typechecker {
         NullT
       case clazz @ Class(className, superClass, fields, methods) =>
         /* check that superClass is declared */
-        if (!ρ.isDeclared(ClassT(superClass)))
-          throw Illtyped(s"Super class: $superClass not declared.")
-
-        if (ρ.isDeclared(ClassT(className))) {
-          throw Illtyped(s"Class name: $className already declared.")
-        } else {
-          ρ.classTable += ((ClassT(className), ClassTypes(clazz)))
-        }
+        val sc = classTable(ClassT(superClass))
 
         val self = "self" -> ClassT(className)
         val fs = for (f @ Decl(k, v) <- fields) yield k.name -> check(f)
@@ -108,9 +135,9 @@ object typechecker {
 
         /* check return type */
         val rtype = methodScope.check(rete)
-        if (retT subtypeOf rtype) NullT else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype. ${ρ.classTable}")
+        if (retT subtypeOf rtype) NullT else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
       case Decl(x, t) =>
-        if (ρ.isDeclared(t)) t else throw Illtyped(s"Type for $x: $t is not declared. ${ρ.classTable}")
+        if (classTable.isDeclared(t)) t else throw Illtyped(s"Type for $x: $t is not declared.")
       /* Statements */
       case Assign(x, e) =>
         val t1 = check(x)
@@ -121,15 +148,14 @@ object typechecker {
           )
       case Update(e1, x, e2) =>
         val receiverT = check(e1)
-        val clazz = ρ.classFor(receiverT)
-        val fieldT = clazz.field(x)
+        val clazz = classTable(receiverT)
+        val fieldT = classTable.field(clazz.selfType, x)
         if (!(fieldT subtypeOf check(e2)))
           throw Illtyped(s"Does not match obj field type.")
         NullT
       case Call(x, e, mn, args) =>
         val fieldT = check(x)
-        val receiver = ρ.classFor(check(e))
-        val method = receiver.method(Var(mn))
+        val method = classTable.method(check(e), Var(mn))
         for ((d, a) <- method.argTs.zip(args)) {
           if (!(check(a).subtypeOf(d)))
             throw Illtyped(s"$a is not subtype $d")
@@ -141,18 +167,18 @@ object typechecker {
 
       case New(x, cn, args) =>
         val fieldT = check(x)
-        val classT = ρ.classFor(ClassT(cn))
-        val declTypes = classT.constructor.argTs
+        val classT = ClassT(cn)
+        val declTypes = classTable.constructor(classT).argTs
 
         for ((d, a) <- declTypes.zip(args)) {
           if (!d.subtypeOf(check(a)))
             throw Illtyped(s"$d $a")
         }
 
-        if (!ClassT(cn).subtypeOf(fieldT))
+        if (!classT.subtypeOf(fieldT))
           throw Illtyped(s"$cn not subtype of ${formatType(fieldT)}")
 
-        ClassT(cn)
+        classT
 
       case If(e, tb, fb) =>
         val guardT = check(e)
@@ -200,8 +226,7 @@ object typechecker {
         ρ(name)
 
       case Access(e, x) =>
-        val receiver = ρ.classFor(check(e))
-        receiver.field(x)
+        classTable.field(check(e), x)
 
       case Binop(op, e1, e2) =>
         val types = (check(e1), check(e2))
@@ -256,7 +281,6 @@ object typechecker {
             case (t1, t2) => throw Illtyped(s"$t1 $t2")
           }
         }
-
     }
   }
 }
