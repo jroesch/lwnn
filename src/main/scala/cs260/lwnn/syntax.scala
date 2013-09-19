@@ -271,18 +271,24 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lazy val argList = "(" ~> repsep(expP, ",") <~ ")"
 
   lazy val expP: Parser[Exp] = (
+      E ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(op, e1, e2) }
+    | E
+  )
+
+  lazy val E: Parser[Exp] = (
       value
     | variable
-    | expP ~ binOpP ~ expP ^^ { case e1 ~ op ~ e2 => Binop(op, e1, e2) }
     | expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
-    | "null" ^^ (_ => Nulls())
-  )
+    | "(" ~> expP <~ ")"
+    )
+
 
   /* need to do non-determinism here */
   lazy val value: Parser[Exp] = (
       int ^^ (d => Nums(Set(BigInt(d))))
     | bool ^^ (b => Bools(Set(b)))
     | string ^^ (s => Strs(Set(s)))
+    | "null" ^^ (_ => Nulls())
     //| "[" ~> (value ~ ".." ~ value) <~ "]" ^^ question for Ben
   )
 

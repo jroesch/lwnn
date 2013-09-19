@@ -12,27 +12,28 @@ class PrettyPrinter(t: AST) {
       printSeq(cls, "\n\n")
     case Class(name, superClass, fields, methods) =>
       val pFields = indentBy(indent(s"fields ${ printSeq(fields.toSeq, ", ") };"))
-      val pMethods = indentBy(indent(s"methods \n${ printSeq(methods.toSeq, "\n", "\n")}"))
-      s"class $name extends $superClass {\n$pFields\n\n$pMethods}\n"
+      val pMethods = indentBy(indent(s"methods \n${ printSeq(methods.toSeq, "\n")}"))
+      s"class $name extends $superClass ${blockIndent(s"$pFields\n\n$pMethods")}"
     case Method(methodName, params, retT, body, retE) =>
-      val pBody = indentBy(printSeq(body, ";\n", ";\n"))
+      val pBody = indentBy(printSeq(body, ";\n", ";"))
       val pParams = printSeq(params, ", ")
-      indent(s"def $methodName($pParams): ${printType(retT)} = {\n$pBody${indentation}}")
+      indent(s"def $methodName($pParams): ${printType(retT)} = ${blockIndent(pBody)}")
     case Decl(Var(n), t) =>
       val pT = printType(t)
       s"$n: $pT"
     case Assign(x, e) =>
-      indent(s"$x := ${printTerm(e)}")
+      indent(s"${printTerm(x)} := ${printTerm(e)}")
     case Update(e1, x, e2) =>
       indent(s"${printTerm(e1)}.${printTerm(x)} := ${printTerm(e2)}")
     case Call(x, e, mn, args) =>
-      indent(s"$x := $e.$mn${printSeq(args, ", ")}")
+      indent(s"${printTerm(x)} := $e.$mn${printSeq(args, ", ")}")
     case New(x, cn, args) =>
       indent(s"${printTerm(x)} := new $cn(${printSeq(args, ", ")})")
     case If(e, tb, fb) =>
-      val pTB = indent(printSeq(tb, ";\n"))
-      val pFB = indent(printSeq(fb, ";\n"))
-      indent(s"if ($e) {\n$pTB\n${indentation}} else {\n$pFB${indentation}}")
+      val pGuard = printTerm(e)
+      val pTB = indentBy(printSeq(tb, ";\n", ";"))
+      val pFB = indentBy(printSeq(fb, ";\n", ";"))
+      indent(s"if ($pGuard) ${blockIndent(pTB)} else ${blockIndent(pFB)}")
     case While(e, body) =>
       val pBody = printSeq(body, ";\n")
       s"while(${printTerm(e)}) {\n$pBody\n}"
@@ -88,5 +89,9 @@ class PrettyPrinter(t: AST) {
 
   def indent(s: => String) = {
     indentation + s
+  }
+
+  def blockIndent(s: => String) = {
+    s"{\n$s\n$indentation}"
   }
 }

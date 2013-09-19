@@ -20,13 +20,13 @@ class TestCase
   end
 
   def dump
-    @result
+    puts @result
   end
 end
 
 class SuccessfulTestCase < TestCase
   def run
-    @result = result = `sbt #{@file_name}`
+    @result = result = `sbt "run #{@file_name}"`
     if result =~ /Parse error: .*\nAt line: .*/
       @status = :parse_error
     elsif result =~ /cs260.lwnn.Illtyped.*/
@@ -40,7 +40,7 @@ end
 
 class FailingTestCase < TestCase
   def run
-    @result = result = `sbt #{@file_name}`
+    @result = result = `sbt "run #{@file_name}"`
     if result =~ /Parse error: .*\nAt line: .*/ || result =~ /cs260.lwnn.Illtyped/
       @status = :success
     else
@@ -53,8 +53,8 @@ end
 
 class TestRunner
   def initialize(passing_tests, failing_tests)
-    @should_pass = passing_tests.map { |x| SuccessfulTestCase.new(passing_tests) }
-    @should_fail = failing_tests.map { |x| FailingTestCase.new(failing_tests) }
+    @should_pass = passing_tests.map { |x| SuccessfulTestCase.new(x) }
+    @should_fail = failing_tests.map { |x| FailingTestCase.new(x) }
     @results = [] 
   end
 
@@ -73,7 +73,11 @@ class TestRunner
   end
 end
 
-tr = TestRunner.new(Dir.foreach(Dir.pwd + '/test/success/').to_a, Dir.foreach(Dir.pwd + '/test/failure/').to_a)
+test_success = 'test/success/'
+test_failure = 'test/failure/'
+good = Dir.foreach(Dir.pwd + '/' + test_success).to_a.select { |f| f[0] != '.' }.map { |f| test_success + f }
+bad = Dir.foreach(Dir.pwd + '/' + test_failure).to_a.select { |f| f[0] != '.' }.map { |f| test_failure + f }
+tr = TestRunner.new(good, bad)
 tr.run
 
 
