@@ -148,8 +148,12 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   type Parser[T] = PackratParser[T]
 
+  var counter = 0
+
   var currentClass: Type = ClassT("TopClass")
-  val classTable = MMap[ClassT, ClassTableEntry](ClassT("TopClass") -> ClassTableEntry(Class("TopClass", null, Set(), Set())))
+
+  val topClassEntry: (Type, ClassTableEntry) =
+    ClassT("TopClass") -> ClassTableEntry(Class("TopClass", null, Set(), Set()))
 
   // reserved keywords
   lexical.reserved ++= Seq("class", "extends", "fields", "methods",
@@ -159,6 +163,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   lexical.delimiters ++= Seq( "+", "-", "*", "/", "&", "|", "=", "!=",
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
+
+  def syntheticVar = {
+    Var(s"tmp_var${counter += 1; counter}")
+  }
 
   def getAST(source: String): Either[String, (ClassTable, AST)] = {
     // strip out comments
@@ -181,7 +189,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val program: Parser[(ClassTable, Program)] = rep(classP) ^^ { cs =>
     val classTable = for (c @ Class(name, _, _, _) <- cs) yield (ClassT(name), ClassTableEntry(c))
-    (ClassTable(Map(classTable: _*)), Program(cs))
+    (ClassTable(Map((topClassEntry :: classTable): _*)), Program(cs))
   }
 
   lazy val classP: Parser[Class] =
@@ -235,9 +243,9 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val stmtP: Parser[Stmt] = (
       update
+    | assign
     | newClass
     | methodCall
-    | assign
     | ifStmt
     | whileStmt
   )
@@ -246,7 +254,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     case v ~ _ ~ e => Assign(v, e)
   }
 
-  lazy val update: Parser[Stmt] = expP ~ "." ~ variable ~ ":=" ~ expP ^^ {
+  lazy val update: Parser[Stmt] = expName ~ "." ~ variable ~ ":=" ~ expP ^^ {
     case obj ~ _ ~ field ~ _ ~ value => Update(obj, field, value)
   }
 
@@ -254,8 +262,11 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     case v ~ _ ~ _ ~ cls ~ params => New(v, cls, params)
   }
 
-  lazy val methodCall: Parser[Stmt] = variable ~ ":=" ~ (variable | expP) ~ "." ~ methodName ~ argList ^^ {
-    case v ~ _ ~ obj ~ _ ~ mname ~ params => Call(v, obj, mname, params)
+  lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ expName ~ "." ~ methodName ~ argList ^^ {
+    case v ~ obj ~ _ ~ mname ~ params => v match {
+      case Some(vn) => Call(vn, obj, mname, params)
+      case None     => Call(syntheticVar, obj, mname, params)
+    }
   }
 
   lazy val ifStmt: Parser[Stmt] = "if" ~ ("(" ~> expP <~ ")") ~ block ~ opt("else" ~>  block) ^^ {
@@ -279,12 +290,21 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   )
 
   lazy val E: Parser[Exp] = (
-      value
+      expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
+    | value
     | variable
-    | expP ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
     | "(" ~> expP <~ ")"
+  )
+
+  lazy val expName: Parser[Exp] = (
+      variable
+    | ambiguousName ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
     )
 
+  lazy val ambiguousName: Parser[Exp] = (
+    variable
+  | ambiguousName ~ "." ~ variable ^^ { case e ~ _ ~ x => Access(e, x) }
+  )
 
   /* need to do non-determinism here */
   lazy val value: Parser[Exp] = (
