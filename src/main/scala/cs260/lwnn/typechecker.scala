@@ -22,7 +22,7 @@ object typechecker {
         case Some(ft) => ft
         case None if clazz.superType == ClassT("TopClass") =>
           throw Illtyped(s"Class $t does not have a field $x.")
-        case None     => field(clazz.superType, x)
+        case None => field(clazz.superType, x)
       }
     }
 
