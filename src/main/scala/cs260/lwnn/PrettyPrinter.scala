@@ -44,7 +44,7 @@ class PrettyPrinter(t: AST) {
     case Bools(bs) =>
       s"[${bs.mkString(", ")}]"
     case Strs(ss) =>
-      s"[${ss.mkString(", ")}]"
+      s"[${ss.map('"' + _ + '"').mkString(", ")}]"
     case Nulls() =>
       "null"
     case Var(n) =>
@@ -73,11 +73,11 @@ class PrettyPrinter(t: AST) {
   }
 
   def printType(t: Type) = t match {
-    case IntT       => "int"
-    case BoolT      => "bool"
-    case StrT       => "string"
-    case NullT      => "null"
-    case ClassT(cn) => cn
+    case IntT       => colorRed("int")
+    case BoolT      => colorRed("bool")
+    case StrT       => colorRed("string")
+    case NullT      => colorRed("null")
+    case ClassT(cn) => colorRed(cn)
   }
 
   def indentBy(s: => String) = {
@@ -93,5 +93,9 @@ class PrettyPrinter(t: AST) {
 
   def blockIndent(s: => String) = {
     s"{\n$s\n$indentation}"
+  }
+
+  def colorRed(s: String) = {
+    s"\033[31m$s\033[0m"
   }
 }
