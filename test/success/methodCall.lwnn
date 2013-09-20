@@ -1,5 +1,4 @@
 class Add {
-  methods
   def add_two(x: int, y: int, z: int): int = {
     z := x + y;
     return x + y;
@@ -7,7 +6,6 @@ class Add {
 }
 
 class MethodCall {
-  methods
   def MethodCall(add: Add, temp: int) = {
     add := new Add();
     temp := add.add_two(10, 1);

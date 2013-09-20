@@ -202,7 +202,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
 
   lazy val classBody: Parser[(Set[Decl], Set[Method])] =
-    opt("fields" ~> rep1sep(fieldP, ",") <~ ";") ~ opt("methods" ~> rep1(methodP)) ^^ {
+    opt("fields" ~> rep1sep(fieldP, ",") <~ ";") ~ opt(rep1(methodP)) ^^ {
       case Some(fields) ~ Some(methods) => (fields.toSet, methods.toSet)
       case Some(fields) ~ None          => (fields.toSet, Set.empty[Method])
       case None ~ Some(methods)         => (Set.empty[Decl], methods.toSet)
@@ -262,11 +262,17 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     case v ~ _ ~ _ ~ cls ~ params => New(v, cls, params)
   }
 
-  lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ expName ~ "." ~ methodName ~ argList ^^ {
-    case v ~ obj ~ _ ~ mname ~ params => v match {
-      case Some(vn) => Call(vn, obj, mname, params)
-      case None     => Call(syntheticVar, obj, mname, params)
-    }
+  lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ opt(expName <~ ".") ~ methodName ~ argList ^^ {
+    case ov ~ obj  ~ mname ~ params =>
+      val receiver = obj match {
+        case Some(o) => o
+        case None => Var("self")
+      }
+      val v = ov match {
+        case Some(vn) => vn
+        case None     => syntheticVar
+      }
+      Call(v, receiver, mname, params)
   }
 
   lazy val ifStmt: Parser[Stmt] = "if" ~ ("(" ~> expP <~ ")") ~ block ~ opt("else" ~>  block) ^^ {

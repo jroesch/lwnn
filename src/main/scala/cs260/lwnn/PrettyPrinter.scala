@@ -12,12 +12,13 @@ class PrettyPrinter(t: AST) {
       printSeq(cls, "\n\n")
     case Class(name, superClass, fields, methods) =>
       val pFields = indentBy(indent(s"fields ${ printSeq(fields.toSeq, ", ") };"))
-      val pMethods = indentBy(indent(s"methods \n${ printSeq(methods.toSeq, "\n")}"))
+      val pMethods = indentBy(printSeq(methods.toSeq, "\n\n"))
       s"class $name extends $superClass ${blockIndent(s"$pFields\n\n$pMethods")}"
     case Method(methodName, params, retT, body, retE) =>
-      val pBody = indentBy(printSeq(body, ";\n", ";"))
+      val pBody = indentBy(printSeq(body, ";\n", ";\n"))
+      val pRet = indentBy(indent(s"return ${ printTerm(retE) };"))
       val pParams = printSeq(params, ", ")
-      indent(s"def $methodName($pParams): ${printType(retT)} = ${blockIndent(pBody)}")
+      indent(s"def $methodName($pParams): ${printType(retT)} = ${blockIndent(pBody + pRet)}")
     case Decl(Var(n), t) =>
       val pT = printType(t)
       s"$n: $pT"
@@ -26,7 +27,7 @@ class PrettyPrinter(t: AST) {
     case Update(e1, x, e2) =>
       indent(s"${printTerm(e1)}.${printTerm(x)} := ${printTerm(e2)}")
     case Call(x, e, mn, args) =>
-      indent(s"${printTerm(x)} := $e.$mn${printSeq(args, ", ")}")
+      indent(s"${printTerm(x)} := ${printTerm(e)}.$mn(${printSeq(args, ", ")})")
     case New(x, cn, args) =>
       indent(s"${printTerm(x)} := new $cn(${printSeq(args, ", ")})")
     case If(e, tb, fb) =>
@@ -69,7 +70,8 @@ class PrettyPrinter(t: AST) {
 
   def printSeq(xs: Seq[AST], sepBy: String, termBy: String = "") = {
     val pXS = for (x <- xs) yield printTerm(x)
-    pXS.mkString(sepBy) + termBy
+    if (pXS.isEmpty) ""
+    else pXS.mkString(sepBy) + termBy
   }
 
   def printType(t: Type) = t match {
@@ -97,5 +99,9 @@ class PrettyPrinter(t: AST) {
 
   def colorRed(s: String) = {
     s"\033[31m$s\033[0m"
+  }
+
+  def colorBlue(s: String) = {
+    s"\033[34m$s\033[0m"
   }
 }

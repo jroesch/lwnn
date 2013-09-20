@@ -1,5 +1,4 @@
 class If {
-  methods
   def If(dummy: int) = {
     if (true & true) {
       dummy := 2 + 2;

@@ -1,7 +1,6 @@
 class Shape {
   fields color: string;
 
-  methods
   def setColor(color: int) = {
     self.color := color;
   }
@@ -14,10 +13,9 @@ class Shape {
 }
 
 class Square extends Shape {
-  methods
   def Square() = {
     self.color := "Hello World!";
-    self.draw();
+    draw();
   }
 }
  

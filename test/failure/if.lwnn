@@ -1,5 +1,4 @@
 class If {
-  methods
   def If(dummy: int) = {
     if (10) {
       dummy := 200;
