@@ -13,7 +13,10 @@ package object lwnn {
       case Left(err) => println(err)
       case Right(program) =>
         val (classTable, ast) = program
-        typecheck(ast, classTable)
+        try { typecheck(ast, classTable) }
+        catch {
+          case i: Illtyped => println(s"TypeError: ${i.msg}")
+        }
         pprint(ast)
     }
   }
