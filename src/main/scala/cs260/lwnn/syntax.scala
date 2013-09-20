@@ -246,6 +246,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     | assign
     | newClass
     | methodCall
+    | assign
     | ifStmt
     | whileStmt
   )
