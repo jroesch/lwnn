@@ -26,6 +26,14 @@ object typechecker {
       }
     }
 
+    def fields(t: Type): Map[Var, Type] = {
+      val clazz = apply(t)
+      clazz.selfType match {
+        case ClassT("TopClass") => Map()
+        case ClassT(_) => clazz.fieldTable ++ fields(clazz.superType)
+      }
+    }
+
     /* Method lookup that supports super classes. */
     def method(t: Type, x: Var): MethodType = {
       val clazz = apply(t)
@@ -96,7 +104,7 @@ object typechecker {
     def apply( x:String ): Type =
       env get x match {
         case Some(τ) ⇒ τ
-        case None => throw Illtyped(s"UndeclaredName: $x not found. ${env}")
+        case None => throw Illtyped(s"UndeclaredName: $x not found.")
       }
 
     /* Extend the environment leaving the mutable classTable the same */
@@ -122,10 +130,16 @@ object typechecker {
         /* check that superClass is declared */
         val sc = classTable(ClassT(superClass))
 
-        val self = "self" -> ClassT(className)
-        val fs = for (f @ Decl(k, v) <- fields) yield k.name -> check(f)
+        val self = Var("self") -> ClassT(className)
 
-        methods map { m => inScope(ρ ++ (self :: fs.toList)) check m }
+        /* Check that it's fields have valid types */
+        for (f @ Decl(k, v) <- fields) yield check(f)
+        /* TODO clean up the code/types in this section */
+        /* Retrieve all fields from the class table including super class fields */
+        val sfs = for ((v, t) <- classTable.fields(ClassT(className)) + self)
+          yield (v.name, t)
+
+        methods map { m => inScope(ρ ++ sfs.toList) check m }
 
         NullT
       case Method(methodName, args, retT, body, rete) =>
