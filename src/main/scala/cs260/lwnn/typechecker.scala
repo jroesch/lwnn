@@ -20,7 +20,7 @@ object typechecker {
       val clazz = apply(t)
       clazz.field(x) match {
         case Some(ft) => ft
-        case None if clazz.superType == "TopClass" =>
+        case None if clazz.superType == ClassT("TopClass") =>
           throw Illtyped(s"Class $t does not have a field $x.")
         case None     => field(clazz.superType, x)
       }
@@ -31,7 +31,7 @@ object typechecker {
       val clazz = apply(t)
       clazz.method(x) match {
         case Some(mt) => mt
-        case None if clazz.superType == "TopClass" =>
+        case None if clazz.superType == ClassT("TopClass") =>
           throw Illtyped(s"Class $t does not have a method $x.")
         case None => method(clazz.superType, x)
       }
@@ -42,7 +42,7 @@ object typechecker {
       val clazz = apply(t)
       clazz.constructor match {
         case Some(cons) => cons
-        case None if clazz.superType == "TopClass" =>
+        case None if clazz.superType == ClassT("TopClass") =>
           MethodType(t, Nil)
         case None =>
           val MethodType(_, argT) = constructor(clazz.superType)
