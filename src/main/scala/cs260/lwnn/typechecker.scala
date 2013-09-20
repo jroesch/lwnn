@@ -6,10 +6,13 @@ import scala.collection.mutable.{ Map => MMap }
 case class Illtyped(msg: String) extends Exception(msg)
 
 object typechecker {
+  def pp(t: AST) = (new cs260.lwnn.PrettyPrinter(t)).print
+  def pt(t: Type) = (new cs260.lwnn.PrettyPrinter(null)).printType(t)
+
   case class ClassTable(table: Map[Type, ClassTableEntry]) {
     def apply(c: Type): ClassTableEntry = table get c match {
       case Some(t) => t
-      case None => throw Illtyped(s"Class name $c is not declared.")
+      case None => throw Illtyped(s"Class name $c is not declared. ${this}")
     }
 
     /* Field lookup that supports super classes. */
@@ -135,9 +138,13 @@ object typechecker {
 
         /* check return type */
         val rtype = methodScope.check(rete)
-        if (retT subtypeOf rtype) NullT else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
-      case Decl(x, t) =>
-        if (classTable.isDeclared(t)) t else throw Illtyped(s"Type for $x: $t is not declared.")
+        if (retT subtypeOf rtype) NullT
+        else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
+      case Decl(x, t) => t match {
+        /* make sure that the type exists in the ClassTable */
+        case c: ClassT => classTable(t).selfType
+        case _         => t
+      }
       /* Statements */
       case Assign(x, e) =>
         val t1 = check(x)
@@ -151,7 +158,7 @@ object typechecker {
         val clazz = classTable(receiverT)
         val fieldT = classTable.field(clazz.selfType, x)
         if (!(fieldT subtypeOf check(e2)))
-          throw Illtyped(s"Does not match obj field type.")
+          throw Illtyped(s"In `${pp(term)}` field has type ${pt(fieldT)} and `${pp(e2)}` has type ${pt(check(e2))}")
         NullT
       case Call(x, e, mn, args) =>
         val fieldT = check(x)
