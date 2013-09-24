@@ -1,4 +1,4 @@
-\documentclass[blockstyle]{sigplanconf}
+\documentclass[10pt]{article}
 \usepackage{pdflscape}
 \usepackage{longtable}
 \usepackage{bcprules}
@@ -25,33 +25,40 @@
 \input{macros}
 \begin{document}
 
-\title{Lwnn Typing Rules}
-\authorinfo{}{}{}
+\title{\textbf{\textsf{Lwnn}} Typing Rules}
+\author{CS 260, Fall 2013}
 \date{}
 \maketitle
 
 \newcommand{\env}{\Gamma \vdash}
 \newcommand{\classK}{\textbf{class}}
 \newcommand{\extends}{\textbf{extends}}
-\newcommand{\intT}{int}
-\newcommand{\stringT}{string}
-\newcommand{\boolT}{bool}
-\newcommand{\nullT}{null}
 \newcommand{\fields}{\textbf{fields}}
+\newcommand{\bop}{\oplus}
 
-\section{Rules}
+\section{Typing Rules}
 \subsection{Helpers}
+We use a ClassTable object to embody the necessary global set of classes. Our ClassTable is adapted from the one used in the 
+FetherweightJava paper and is a map from class names to class declarations. Providing a mechanism for looking up field and 
+method types for a given class.  A program then is a pair (CT, e), we also make the assumption that the ClassTable is fixed.
 
-The ClassTable is adapted by the one described in FetherweightJava and is a mapping from class names to declarations,
-providing a mechanism for looking up class information. A program then is a pair (CT, e) we borrow their assumption and
-assume that the CT is fixed as well.
-
-method(m, C) = classTable.lookup(C).method(m)
-field(f, C) = classTable.lookup(C).field(f)
+\begin{align*}
+lookup : ClassTable \times ClassT \to Class
+\\
+lookup(ct, C) = ct[C]
+\\\\
+method : ClassT \times Var \to Type
+\\
+method(C, m) = classTable.lookup(C).method(m)
+\\\\
+field : ClassT \times Var \to Type
+\\
+field(C, f) = classTable.lookup(C).field(f)
+\end{align*}
 
 \subsection{Subtyping}
 
-\infax
+\infax[Reflexivity]
 { A <: A }
 
 \infrule[Transitivity]
@@ -60,37 +67,72 @@ field(f, C) = classTable.lookup(C).field(f)
 
 \infrule[Inheritance]
 { \class\ C\ extends\ D\ \{ ... \} }
-{ C <: D \andalso \Gamma[ }
+{ C <: D }
+
+\subsection{Classes}
+\infrule[T-Class]{ \env }{ todo }
+
+\subsection{Methods}
+\infrule[T-Method]{ \env }{ todo }
+
+\subsection{Statements}
+\infrule[T-Assign]
+{\env x : \tau \andalso \env e : \tau}
+{ x := e : \nullt }
+
+\infrule[T-Update]
+{ \env e_1 : C \andalso field(C, x) = \tau_f \andalso \env e_2 : \tau_f }
+{ e_1.x := e_2 : \nullt }
+
+\infrule[T-Method-Invocation]
+{\env e : C \andalso method(C, m) = \vec{\tau_d} \rightarrow \tau_r \andalso \env \vec{e_i} : \vec{\tau_c} \andalso \vec{\tau_c} <: \vec{\tau_d} \andalso \env x : \tau_r }
+{\env x := e.m(\vec{e_i}) : \nullt }
+
+\infrule[T-New]
+{\env x: D \andalso \env e : C \andalso method(C, "C") = \vec{\tau_i} \rightarrow C \andalso \vec{e_i}: \vec{\tau_i} \andalso C <: D \andalso \textbf{new\ } C(\vec{e_i}) : D }
+{\env x := \textbf{new\ } C(\vec{e_i}) : \nullt }
+
+\infrule[T-If]
+{\env e: \boolt}
+{ \textbf{if}\ (e)\ \vec{s_1} \ \textbf{else}\ \vec{s_2} : \nullt}
+
+\infrule[T-While]
+{\env e: \boolt}
+{ \textbf{while}\ (e)\ \vec{s} : \nullt }
+
+\subsection{Expressions}
+\infax[T-Int]
+{ \env i : \intt }
+
+\infax[T-String]
+{ \env \str: \strt }
+
+\infax[T-True]
+{ \env \true: \boolt}
+
+\infax[T-False]
+{ \env \false: \boolt }
+
+\infax[T-Nulls]
+{ \env  \nullv: \nullt }
 
 \infax[T-Var]
 {\env x : \Gamma(x)}
 
-\infrule[T-Access]{}{}
+\infrule[T-Access]
+{\env e : C \andalso field(C, f) = \tau}
+{\env e.f : \tau}
 
-\infrule[T-Method-Invocation]
-{ \env e : C \andalso method(m, C) = \vec{D_i} \rightarrow \tau_r \andalso \env \vec{e_i} : \vec{\tau_i} \andalso \vec{\tau_i} <: \vec{D_i}}
-{\env e.m(\vec{e_i}) : \tau_r }
-\infax
-{ \env i : \intt }
+\infrule[T-NumOps]
+{\bop \in \{+, -, *, \div, <, \leq\} \andalso \env e_1: \intt \andalso \env e_2: \intt}
+{e_1 \bop e_2: \intt}
 
-\infax
-{ \env \str: \strt }
+\infrule[T-BoolOps]
+{\bop \in \{\land, \lor\} \andalso \env e_1 : \boolt \andalso \env e_2: \boolt}
+{e_1 \bop e_2 : \boolt}
 
-\infax
-{ \env \true: \boolt}
-
-\infax
-{ \env \false: \boolt }
-
-\infax
-{ \env  \nullv: \nullt }
-
-\infrule
-{ \env } 
-{ \env \fields x_i : t_i }
-
-\infrule
-{ \env t_i : \classK T \extends S}
-{ b }
+\infrule[T-EqOps]
+{\bop \in \{ =, \neq \} \andalso \env e_1 :\tau_1 \andalso \env e_2: \tau_2}
+{e_1 \bop e_2: \boolt}
 
 \end{document}
