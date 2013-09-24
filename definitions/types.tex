@@ -78,11 +78,11 @@ field(C, f) = classTable.lookup(C).field(f)
 \subsection{Statements}
 \infrule[T-Assign]
 {\env x : \tau \andalso \env e : \tau}
-{ x := e : \nullt }
+{\env x := e : \nullt }
 
 \infrule[T-Update]
 { \env e_1 : C \andalso field(C, x) = \tau_f \andalso \env e_2 : \tau_f }
-{ e_1.x := e_2 : \nullt }
+{ \env e_1.x := e_2 : \nullt }
 
 \infrule[T-Method-Invocation]
 {\env e : C \andalso method(C, m) = \vec{\tau_d} \rightarrow \tau_r \andalso \env \vec{e_i} : \vec{\tau_c} \andalso \vec{\tau_c} <: \vec{\tau_d} \andalso \env x : \tau_r }
@@ -94,11 +94,11 @@ field(C, f) = classTable.lookup(C).field(f)
 
 \infrule[T-If]
 {\env e: \boolt}
-{ \textbf{if}\ (e)\ \vec{s_1} \ \textbf{else}\ \vec{s_2} : \nullt}
+{\env \textbf{if}\ (e)\ \vec{s_1} \ \textbf{else}\ \vec{s_2} : \nullt}
 
 \infrule[T-While]
 {\env e: \boolt}
-{ \textbf{while}\ (e)\ \vec{s} : \nullt }
+{\env \textbf{while}\ (e)\ \vec{s} : \nullt }
 
 \subsection{Expressions}
 \infax[T-Int]
@@ -125,14 +125,14 @@ field(C, f) = classTable.lookup(C).field(f)
 
 \infrule[T-NumOps]
 {\bop \in \{+, -, *, \div, <, \leq\} \andalso \env e_1: \intt \andalso \env e_2: \intt}
-{e_1 \bop e_2: \intt}
+{\env e_1 \bop e_2: \intt}
 
 \infrule[T-BoolOps]
 {\bop \in \{\land, \lor\} \andalso \env e_1 : \boolt \andalso \env e_2: \boolt}
-{e_1 \bop e_2 : \boolt}
+{\env e_1 \bop e_2 : \boolt}
 
 \infrule[T-EqOps]
 {\bop \in \{ =, \neq \} \andalso \env e_1 :\tau_1 \andalso \env e_2: \tau_2}
-{e_1 \bop e_2: \boolt}
+{\env e_1 \bop e_2: \boolt}
 
 \end{document}
