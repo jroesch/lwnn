@@ -1,12 +1,34 @@
 class LinkedListNode {
   fields data: int, next: LinkedListNode;
+
+  def LinkedListNode(data: int, next: LinkedListNode) = {
+    self.data := data;
+    self.next := next;
+  }
 }
 
 class LinkedList {
   fields head: LinkedListNode;
 
   def LinkedList(data: int, next: LinkedListNode, h: LinkedListNode) = {
-    h := new LinkedListNode(data, 10);
+    h := new LinkedListNode(data, null);
     self.head := h;
+  }
+
+  def cons(data: int, temp: LinkedListNode) = {
+    temp := new LinkedListNode(data, self.head);
+    self.head := temp;
+  }
+
+  def delete(slot: int, temp: LinkedListNode, count : int): int = {
+    count := 0;
+    temp := self.head;
+    while (count != slot) {
+      count := count + 1;
+      temp := temp.next;
+    };
+    count := temp.next.data;
+    temp.next := temp.next.next;
+    return count;
   }
 }
