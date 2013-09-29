@@ -98,6 +98,10 @@ case class ClassT(cn: ClassName) extends Type {
   }
 }
 
+case object SyntheticType extends Type {
+  def ⊑ ( τ:Type )(implicit classTable: ClassTable) = true
+}
+
 //——————————————————————————————————————————————————————————————————————————————
 // Stmt
 //

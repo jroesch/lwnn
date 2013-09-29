@@ -107,6 +107,9 @@ object typechecker {
         case None => throw Illtyped(s"UndeclaredName: $x not found.")
       }
 
+    def +(binding: (String, Type)): TypeEnv =
+      TypeEnv(env + binding)
+
     /* Extend the environment leaving the mutable classTable the same */
     def ++( bindings:Seq[(String, Type)] ): TypeEnv =
       TypeEnv(env ++ bindings)
@@ -130,16 +133,12 @@ object typechecker {
         /* check that superClass is declared */
         val sc = classTable(ClassT(superClass))
 
-        val self = Var("self") -> ClassT(className)
+        val self = "self" -> ClassT(className)
 
         /* Check that it's fields have valid types */
         for (f @ Decl(k, v) <- fields) yield check(f)
-        /* TODO clean up the code/types in this section */
-        /* Retrieve all fields from the class table including super class fields */
-        val sfs = for ((v, t) <- classTable.fields(ClassT(className)) + self)
-          yield (v.name, t)
 
-        methods map { m => inScope(ρ ++ sfs.toList) check m }
+        methods map { m => inScope(ρ + self) check m }
 
         NullT
       case Method(methodName, args, retT, body, rete) =>
@@ -150,7 +149,6 @@ object typechecker {
         /* check that each stmt in correct */
         for (stmt <- body) { methodScope.check(stmt) }
 
-        /* check return type */
         val rtype = methodScope.check(rete)
         if (retT subtypeOf rtype) NullT
         else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
@@ -203,18 +201,7 @@ object typechecker {
 
       case If(e, tb, fb) =>
         val guardT = check(e)
-        /* see below section
-        val tT = ???
-        val fT = ???
-        */
         if (guardT != BoolT) throw Illtyped(s"$e must be of type bool.")
-        /* if *if* returns a value */
-        /* (tT.subtypeOf(fT), fT.subtypeOf(tT)) match {
-          case (true, true) => tT
-          case (false, true) => tT
-          case (true, false) => tF
-          case (false, false) => throw Illtyped(s"No LUB on $t1 $t2")
-        } */
         for (stmt <- tb ++ fb) yield check(stmt)
         NullT
 
