@@ -2,6 +2,11 @@ package cs260.lwnn
 
 import cs260.lwnn.syntax._
 
+object PrettyPrinter {
+  def print(t: AST): String = (new PrettyPrinter(t)).print
+  def printType(t: Type): String = (new PrettyPrinter(null)).printType(t)
+}
+
 class PrettyPrinter(t: AST) {
   var indentationLevel = 0
   def indentation = "  " * indentationLevel
@@ -10,48 +15,66 @@ class PrettyPrinter(t: AST) {
   def printTerm(t: AST): String = t match {
     case Program(cls) =>
       printSeq(cls, "\n\n")
+
     case Class(name, superClass, fields, methods) =>
-      val pFields = indentBy(indent(s"fields ${ printSeq(fields.toSeq, ", ") };"))
+      val pFields = indentBy(indent(s"${keyword("fields")} ${ printSeq(fields.toSeq, ", ") };"))
       val pMethods = indentBy(printSeq(methods.toSeq, "\n\n"))
-      s"class $name extends $superClass ${blockIndent(s"$pFields\n\n$pMethods")}"
+      s"${keyword("class")} ${colorRed(name)} ${keyword("extends")} ${colorRed(superClass)}" +
+        s" ${blockIndent(s"$pFields\n\n$pMethods")}"
+
     case Method(methodName, params, retT, body, retE) =>
       val pBody = indentBy(printSeq(body, ";\n", ";\n"))
-      val pRet = indentBy(indent(s"return ${ printTerm(retE) };"))
+      val pRet = indentBy(indent(s"${keyword("return")} ${ printTerm(retE) };"))
       val pParams = printSeq(params, ", ")
-      indent(s"def $methodName($pParams): ${printType(retT)} = ${blockIndent(pBody + pRet)}")
+      indent(s"${keyword("def")} $methodName($pParams): ${printType(retT)} = ${blockIndent(pBody + pRet)}")
+
     case Decl(Var(n), t) =>
       val pT = printType(t)
       s"$n: $pT"
+
     case Assign(x, e) =>
       indent(s"${printTerm(x)} := ${printTerm(e)}")
+
     case Update(e1, x, e2) =>
       indent(s"${printTerm(e1)}.${printTerm(x)} := ${printTerm(e2)}")
+
     case Call(x, e, mn, args) =>
       indent(s"${printTerm(x)} := ${printTerm(e)}.$mn(${printSeq(args, ", ")})")
+
     case New(x, cn, args) =>
-      indent(s"${printTerm(x)} := new $cn(${printSeq(args, ", ")})")
+      indent(s"${printTerm(x)} := ${keyword("new")} $cn(${printSeq(args, ", ")})")
+
     case If(e, tb, fb) =>
       val pGuard = printTerm(e)
       val pTB = indentBy(printSeq(tb, ";\n", ";"))
       val pFB = indentBy(printSeq(fb, ";\n", ";"))
-      indent(s"if ($pGuard) ${blockIndent(pTB)} else ${blockIndent(pFB)}")
+      indent(s"${keyword("if")} ($pGuard) ${blockIndent(pTB)} else ${blockIndent(pFB)}")
+
     case While(e, body) =>
-      val pBody = printSeq(body, ";\n")
-      s"while(${printTerm(e)}) {\n$pBody\n}"
+      val pBody = indentBy(printSeq(body, ";\n"))
+      indent(s"${keyword("while")} (${printTerm(e)}) ${blockIndent(pBody)}")
+
     case Print(e) =>
       s"print($e)"
+
     case Nums(ns) =>
       s"{ ${ns.mkString(", ")} }"
+
     case Bools(bs) =>
       s"{ ${bs.mkString(", ")} }"
+
     case Strs(ss) =>
       s"{ ${ss.map('"' + _ + '"').mkString(", ")} }"
+
     case Nulls() =>
       "null"
+
     case Var(n) =>
       n
+
     case Access(e, x) =>
       s"${printTerm(e)}.x"
+
     case Binop(op, e1, e2) =>
       val pOp = op match {
         case ⌜+⌝ => "+"
@@ -83,6 +106,9 @@ class PrettyPrinter(t: AST) {
     case SyntheticType =>
       colorRed("SyntheticType")
   }
+
+  def keyword(s: String) =
+    colorBlue(s)
 
   def indentBy(s: => String) = {
     indentationLevel += 1
