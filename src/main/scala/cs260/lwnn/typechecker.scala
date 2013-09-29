@@ -152,6 +152,7 @@ object typechecker {
         val rtype = methodScope.check(rete)
         if (retT subtypeOf rtype) NullT
         else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
+
       case Decl(x, t) => t match {
         /* make sure that the type exists in the ClassTable */
         case c: ClassT => classTable(t).selfType

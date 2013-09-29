@@ -41,11 +41,11 @@ class PrettyPrinter(t: AST) {
     case Print(e) =>
       s"print($e)"
     case Nums(ns) =>
-      s"[${ns.mkString(", ")}]"
+      s"{ ${ns.mkString(", ")} }"
     case Bools(bs) =>
-      s"[${bs.mkString(", ")}]"
+      s"{ ${bs.mkString(", ")} }"
     case Strs(ss) =>
-      s"[${ss.map('"' + _ + '"').mkString(", ")}]"
+      s"{ ${ss.map('"' + _ + '"').mkString(", ")} }"
     case Nulls() =>
       "null"
     case Var(n) =>
@@ -80,6 +80,8 @@ class PrettyPrinter(t: AST) {
     case StrT       => colorRed("string")
     case NullT      => colorRed("null")
     case ClassT(cn) => colorRed(cn)
+    case SyntheticType =>
+      colorRed("SyntheticType")
   }
 
   def indentBy(s: => String) = {

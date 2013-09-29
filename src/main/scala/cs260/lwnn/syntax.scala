@@ -50,7 +50,7 @@ case object IntT extends Type {
   // IntT isn't a subtype of anything but itself
   def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
-      case IntT ⇒ true
+      case  SyntheticType | IntT ⇒ true
       case _ ⇒ false
     }
 }
@@ -59,7 +59,7 @@ case object BoolT extends Type {
   // BoolT isn't a subtype of anything but itself
   def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
-      case BoolT ⇒ true
+      case SyntheticType | BoolT ⇒ true
       case _ ⇒ false
     }
 }
@@ -68,7 +68,7 @@ case object StrT extends Type {
   // StrT isn't a subtype of anything but itself
   def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
-      case StrT ⇒ true
+      case SyntheticType | StrT ⇒ true
       case _ ⇒ false
     }
 }
@@ -77,7 +77,7 @@ case object NullT extends Type {
   // NullT is a subtype of itself and all classes
   def ⊑ ( τ:Type )(implicit classTable: ClassTable) =
     τ match {
-      case NullT | _:ClassT ⇒ true
+      case NullT | SyntheticType|  _:ClassT ⇒ true
       case _ ⇒ false
     }
 }
@@ -85,12 +85,12 @@ case object NullT extends Type {
 case class ClassT(cn: ClassName) extends Type {
   // the subtyping of classes depends on the user's program
   def ⊑ ( τ:Type )(implicit classTable: ClassTable) = τ match {
+    case SyntheticType => true
     case ClassT("TopClass") => true
     case ClassT(_) if cn == "TopClass" => false
     case o @ ClassT(on) =>
       val tpe = classTable(this)
       val other = classTable(o)
-      println(tpe, other)
       if (tpe.selfType == other.selfType || tpe.superType == other.selfType)
         true
       else tpe.superType.subtypeOf(o)
@@ -153,6 +153,8 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
   type Parser[T] = PackratParser[T]
 
   var counter = 0
+  /* keep track of synthetic vars inside of a method */
+  var syntheticSet = Set[Decl]()
 
   var currentClass: Type = ClassT("TopClass")
 
@@ -168,8 +170,9 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 			 "<", "<=", "{", "}", "(", ")", ":=", ";",
 			 ",", "[", "]", ".", ":", "..", "=>", "##" )
 
-  def syntheticVar = {
-    Var(s"tmp_var${counter += 1; counter}")
+  def syntheticVar() = {
+    val v = Var(s"tmp_var${counter += 1; counter}")
+    syntheticSet += Decl(v, SyntheticType); v
   }
 
   def getAST(source: String): Either[String, (ClassTable, AST)] = {
@@ -227,10 +230,13 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val methodP: Parser[Method] =
   "def" ~ methodName ~ ("(" ~> paramList <~ ")") ~ opt(":" ~> typeP) ~ "=" ~ ("{" ~> methodBody <~ "}") ^^ {
-    case _ ~ mname ~ params ~ retType ~ _ ~ ((body, ret)) => retType match {
-      case None => Method(mname, params, currentClass, body, ret)
-      case Some(tpe) => Method(mname, params, tpe, body, ret)
-    }
+    case _ ~ mname ~ params ~ retType ~ _ ~ ((body, ret)) =>
+      val method = retType match {
+        case None => Method(mname, params ++ syntheticSet.toList, currentClass, body, ret)
+        case Some(tpe) => Method(mname, params ++ syntheticSet.toList, tpe, body, ret)
+      }
+      syntheticSet = Set()
+      method
   }
 
   lazy val paramList: Parser[Seq[Decl]]=
@@ -247,7 +253,6 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val stmtP: Parser[Stmt] = (
       update
-    | assign
     | newClass
     | methodCall
     | assign
@@ -273,9 +278,10 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
         case Some(o) => o
         case None => Var("self")
       }
+
       val v = ov match {
         case Some(vn) => vn
-        case None     => syntheticVar
+        case None     => syntheticVar()
       }
       Call(v, receiver, mname, params)
   }
@@ -323,8 +329,14 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     | bool ^^ (b => Bools(Set(b)))
     | string ^^ (s => Strs(Set(s)))
     | "null" ^^ (_ => Nulls())
-    //| "[" ~> (value ~ ".." ~ value) <~ "]" ^^ question for Ben
+    | intSet
+    | boolSet
+    | strSet
   )
+
+  lazy val intSet = "{" ~> repsep(int, ",") <~ "}" ^^ { v => Nums(v.map(x => BigInt(x)).toSet) }
+  lazy val boolSet = "{" ~> repsep(bool, ",") <~ "}" ^^ { v => Bools(v.toSet) }
+  lazy val strSet = "{" ~> repsep(string, ",") <~ "}" ^^ { v => Strs(v.toSet) }
 
   lazy val binOpP = (
       "+"  ^^^ ⌜+⌝

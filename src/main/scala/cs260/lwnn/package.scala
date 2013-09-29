@@ -15,8 +15,12 @@ package object lwnn {
         val (classTable, ast) = program
         try { typecheck(ast, classTable) }
         catch {
-          case i: Illtyped => println(s"TypeError: ${i.msg}")
+          case i: Illtyped =>
+            println(s"TypeError: ${i.msg}")
+            //println(i.getStackTrace)
+            //exit(1);
         }
+        println(("-" * 10) + " AST " + ("-" * 10))
         pprint(ast)
     }
   }

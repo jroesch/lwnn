@@ -1,0 +1,11 @@
+class SyntheticVar {
+  fields x : int;
+
+  def foo(): int = {
+    return 10;
+  }
+
+  def SyntheticVar() = {
+    foo();
+  }
+}
