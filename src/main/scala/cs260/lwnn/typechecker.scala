@@ -6,8 +6,8 @@ import scala.collection.mutable.{ Map => MMap }
 case class Illtyped(msg: String) extends Exception(msg)
 
 object typechecker {
-  def pp(t: AST) = (new cs260.lwnn.PrettyPrinter(t)).print
-  def pt(t: Type) = (new cs260.lwnn.PrettyPrinter(null)).printType(t)
+  def pp(t: AST) = PrettyPrinter.print(t)
+  def pt(t: Type) = PrettyPrinter.printType(t)
 
   case class ClassTable(table: Map[Type, ClassTableEntry]) {
     def apply(c: Type): ClassTableEntry = table get c match {
@@ -23,14 +23,6 @@ object typechecker {
         case None if clazz.superType == ClassT("TopClass") =>
           throw Illtyped(s"Class $t does not have a field $x.")
         case None => field(clazz.superType, x)
-      }
-    }
-
-    def fields(t: Type): Map[Var, Type] = {
-      val clazz = apply(t)
-      clazz.selfType match {
-        case ClassT("TopClass") => Map()
-        case ClassT(_) => clazz.fieldTable ++ fields(clazz.superType)
       }
     }
 
@@ -116,15 +108,6 @@ object typechecker {
   }
 
   case class inScope(ρ: TypeEnv)(implicit classTable: ClassTable) {
-
-    def formatType(t: Type) = t match {
-      case ClassT(cn) => cn
-      case BoolT      => "bool"
-      case IntT       => "int"
-      case StrT       => "string"
-      case NullT      => "null"
-    }
-
     def check(term: AST): Type = term match {
       case Program(classes) =>
         for (clazz <- classes) yield check(clazz)
@@ -150,7 +133,7 @@ object typechecker {
         for (stmt <- body) { methodScope.check(stmt) }
 
         val rtype = methodScope.check(rete)
-        if (retT subtypeOf rtype) NullT
+        if (retT ⊑ rtype) NullT
         else throw Illtyped(s"Declared return type: $retT does match actual return type of $rtype.")
 
       case Decl(x, t) => t match {
@@ -162,26 +145,27 @@ object typechecker {
       case Assign(x, e) =>
         val t1 = check(x)
         val t2 = check(e)
-        if (t2 subtypeOf t1) NullT else
+        if (t2 ⊑ t1) NullT else
           throw Illtyped(
-            s"Attempting to assign value of type ${formatType(t1)} to a variable of type ${formatType(t2)}"
+            s"Attempting to assign value of type ${pt(t1)} to a variable of type ${pt(t2)}"
           )
+
       case Update(e1, x, e2) =>
         val receiverT = check(e1)
         val clazz = classTable(receiverT)
         val fieldT = classTable.field(clazz.selfType, x)
-        if (!(fieldT subtypeOf check(e2)))
-          throw Illtyped(s"In `${pp(term)}` field has type ${pt(fieldT)} and `${pp(e2)}` has type ${pt(check(e2))}")
-        NullT
+        if (fieldT ⊑ check(e2)) NullT
+        else throw Illtyped(s"In `${pp(term)}` field has type ${pt(fieldT)} and `${pp(e2)}` has type ${pt(check(e2))}")
+
       case Call(x, e, mn, args) =>
         val fieldT = check(x)
         val method = classTable.method(check(e), Var(mn))
         for ((d, a) <- method.argTs.zip(args)) {
-          if (!(check(a).subtypeOf(d)))
+          if (!(check(a) ⊑ d))
             throw Illtyped(s"$a is not subtype $d")
         }
 
-        if (!method.returnT.subtypeOf(fieldT))
+        if (!(method.returnT ⊑ fieldT))
           throw Illtyped(s"${ method.returnT } is not subtype $fieldT")
         NullT
 
@@ -191,25 +175,24 @@ object typechecker {
         val declTypes = classTable.constructor(classT).argTs
 
         for ((d, a) <- declTypes.zip(args)) {
-          if (!d.subtypeOf(check(a)))
-            throw Illtyped(s"$d $a")
+          if (!(check(a) ⊑ d))
+            throw Illtyped(s"Argument type ${pt(check(a))} does not match declared type ${pt(d)}")
         }
 
-        if (!classT.subtypeOf(fieldT))
-          throw Illtyped(s"$cn not subtype of ${formatType(fieldT)}")
+        if (classT ⊑ fieldT) classT
+        else throw Illtyped(s"$cn not subtype of ${pt(fieldT)}")
 
-        classT
 
       case If(e, tb, fb) =>
         val guardT = check(e)
-        if (guardT != BoolT) throw Illtyped(s"$e must be of type bool.")
+        if (guardT != BoolT) throw Illtyped(s"`${pp(e)}` must be of type bool.")
         for (stmt <- tb ++ fb) yield check(stmt)
         NullT
 
-      case While( e, body ) =>
+      case w @ While( e, body ) =>
         /* check guard */
-        if (check(e) == BoolT)
-          throw Illtyped(s"$e must be of type bool.")
+        if (check(e) != BoolT)
+          throw Illtyped(s"`${pp(e)}` must be of type ${pt(BoolT)} in\n\n${pp(w)}")
         /* check body */
         for (stmt <- body) yield check(stmt)
         /* unit */
@@ -240,54 +223,27 @@ object typechecker {
       case Binop(op, e1, e2) =>
         val types = (check(e1), check(e2))
         op match {
-          case ⌜+⌝ => types match {
+          case ⌜+⌝ | ⌜−⌝ | ⌜×⌝ | ⌜÷⌝ => types match {
             case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
+            case (t1, t2)     =>
+              throw Illtyped(s"${pt(t1)} ${pt(t2)}  must both be int.")
           }
 
-          case ⌜−⌝ => types match {
+          case ⌜<⌝ | ⌜≤⌝ => types match {
             case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
+            case (StrT, StrT) => StrT
+            case (t1, t2)     =>
+              throw Illtyped(s"${pt(t1)} ${pt(t2)}  must both be either int or string.")
           }
 
-          case ⌜×⌝ => types match {
-            case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜÷⌝ => types match {
-            case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜<⌝ => types match {
-            case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜≤⌝ => types match {
-            case (IntT, IntT) => IntT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜∧⌝ => types match {
+          case ⌜∧⌝ | ⌜∨⌝ => types match {
             case (BoolT, BoolT) => BoolT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
+            case (t1, t2)       =>
+              throw Illtyped(s"${pt(t1)} ${pt(t2)} must both be bool.")
           }
 
-          case ⌜∨⌝ => types match {
-            case (BoolT, BoolT) => BoolT
-            case (t1, t2)     => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜≈⌝ => types match {
-            case (t1, t2) if t1.subtypeOf(t2) => BoolT
-            case (t1, t2) => throw Illtyped(s"$t1 $t2")
-          }
-
-          case ⌜≠⌝ => types match {
-            case (t1, t2) if t1.subtypeOf(t2) => BoolT
-            case (t1, t2) => throw Illtyped(s"$t1 $t2")
+          case ⌜≈⌝ | ⌜≠⌝ => types match {
+            case (t1, t2) => BoolT
           }
         }
     }
