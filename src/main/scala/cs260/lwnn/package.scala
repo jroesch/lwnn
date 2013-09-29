@@ -13,15 +13,17 @@ package object lwnn {
       case Left(err) => println(err)
       case Right(program) =>
         val (classTable, ast) = program
-        try { typecheck(ast, classTable) }
+        try {
+          typecheck(ast, classTable)
+          /* print AST for now, until concrete impl. */
+          println(("-" * 10) + " AST " + ("-" * 10))
+          pprint(ast)
+        }
         catch {
           case i: Illtyped =>
             println(s"TypeError: ${i.msg}")
             //println(i.getStackTrace)
-            //exit(1);
         }
-        println(("-" * 10) + " AST " + ("-" * 10))
-        pprint(ast)
     }
   }
 }
