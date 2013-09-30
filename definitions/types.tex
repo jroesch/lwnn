@@ -31,10 +31,8 @@
 \maketitle
 
 \newcommand{\env}{\Gamma \vdash}
-\newcommand{\classK}{\textbf{class}}
-\newcommand{\extends}{\textbf{extends}}
-\newcommand{\fields}{\textbf{fields}}
 \newcommand{\bop}{\oplus}
+\newcommand{\subtype}{\sqsubseteq}
 
 \section{Typing Rules}
 \subsection{Helpers}
@@ -43,61 +41,58 @@ FetherweightJava paper and is a map from class names to class declarations. Prov
 method types for a given class.  A program then is a pair (CT, e), we also make the assumption that the ClassTable is fixed.
 
 \begin{align*}
-lookup : ClassTable \times ClassT \to Class
-\\
-lookup(ct, C) = ct[C]
-\\\\
-method : ClassT \times Var \to Type
-\\
-method(C, m) = classTable.lookup(C).method(m)
-\\\\
-field : ClassT \times Var \to Type
-\\
-field(C, f) = classTable.lookup(C).field(f)
+t \in ClassTable = ClassName \rightarrow ((Variable \rightarrow Type) \times (MethodName \rightarrow MethodType)) \\
+mt \in MethodType = MethodName \rightarrow (\overrightarrow{Type}, Type)
 \end{align*}
 
 \subsection{Subtyping}
 
 \infax[Reflexivity]
-{ A <: A }
+{ \cname \subtype \cname }
 
 \infrule[Transitivity]
-{ C <: B \andalso B <: A}
-{ C  <: A }
+{ \cname_c \subtype \cname_b \andalso \cname_b \subtype \cname_a }
+{ \cname_c \subtype \cname_a }
 
-\infrule[Inheritance]
-{ \class\ C\ extends\ D\ \{ ... \} }
-{ C <: D }
+\infrule[Definition]
+{ \kw{classs } \cname_1 \kw{ extends } \cname_2 \ \{ ... \}}
+{ \cname_1 \subtype \cname_2 }
 
 \subsection{Classes}
-\infrule[T-Class]{ \env }{ todo }
+\infrule[T-Class]
+{ \kw{class } \cname_1 \kw{ extends } \cname_2 \;\left\{\; \kw{fields }\wseq{x : \typ} \;\cdot\; \kw{methods}\; \wseq{m} \;\right\}  \in \vec{class}
+\andalso m \in \vec{m} \andalso \env m : \tau }
+{ \env \vec{class} : \nullt }
 
 \subsection{Methods}
-\infrule[T-Method]{ \env }{ todo }
+\infrule[T-Method]
+{ \Gamma' = \Gamma[\overrightarrow{x : \tau}] \andalso \Gamma' \vdash \overrightarrow{s : \tau_s} \andalso \Gamma' \vdash e : \tau_r }
+{ \env \kw{def } \mname(\overrightarrow{x : \tau}): \tau_r = \{ \vec{s} \cdot \kw{return } e \}  : \nullt }
 
 \subsection{Statements}
 \infrule[T-Assign]
-{\env x : \tau \andalso \env e : \tau}
+{\env x : \tau_1 \andalso \env e : \tau_2 \andalso \tau_2 \subtype \tau_1}
 {\env x := e : \nullt }
 
 \infrule[T-Update]
-{ \env e_1 : C \andalso field(C, x) = \tau_f \andalso \env e_2 : \tau_f }
+{ \env e_1 : \cname \andalso field(\cname, x) = \tau_f \andalso \env e_2 : \tau_v \andalso \tau_v \subtype \tau_f}
 { \env e_1.x := e_2 : \nullt }
 
 \infrule[T-Method-Invocation]
-{\env e : C \andalso method(C, m) = \vec{\tau_d} \rightarrow \tau_r \andalso \env \vec{e_i} : \vec{\tau_c} \andalso \vec{\tau_c} <: \vec{\tau_d} \andalso \env x : \tau_r }
-{\env x := e.m(\vec{e_i}) : \nullt }
+{\env x : \tau_x \andalso \env e : cn \andalso method(cn, mn) = \vec{\tau}\ ' \rightarrow \tau_r \andalso \env \overrightarrow{e_i : \tau_i} \andalso \overrightarrow{\tau_i' \subtype \tau_i } \andalso \tau_r \subtype \tau_x}
+{\env x := e.mn(\vec{e}) : \nullt }
 
 \infrule[T-New]
-{\env x: D \andalso \env e : C \andalso method(C, "C") = \vec{\tau_i} \rightarrow C \andalso \vec{e_i}: \vec{\tau_i} \andalso C <: D \andalso \textbf{new\ } C(\vec{e_i}) : D }
-{\env x := \textbf{new\ } C(\vec{e_i}) : \nullt }
+{\env x: \tau_x \andalso \env e : \cname \andalso method(\cname, \cname) = \vec{\tau}\ ' \rightarrow \tau_r \andalso \env \overrightarrow{e_i : \tau_i} \\
+\andalso \overrightarrow{\tau_i' \subtype \tau_i }  \andalso \env \tau_r \subtype \tau_x \andalso \env \textbf{new\ } C(\vec{e}) : \tau_r }
+{\env x := \kw{new } \cname(\vec{e}) : \nullt }
 
 \infrule[T-If]
-{\env e: \boolt}
+{\env e: \boolt \andalso \env \overrightarrow{s_i : \tau_i} \andalso \env  \overrightarrow{s_j : \tau_j} }
 {\env \textbf{if}\ (e)\ \vec{s_1} \ \textbf{else}\ \vec{s_2} : \nullt}
 
 \infrule[T-While]
-{\env e: \boolt}
+{\env e: \boolt \andalso \env \overrightarrow{s_i : \tau_i}}
 {\env \textbf{while}\ (e)\ \vec{s} : \nullt }
 
 \subsection{Expressions}
@@ -120,12 +115,16 @@ field(C, f) = classTable.lookup(C).field(f)
 {\env x : \Gamma(x)}
 
 \infrule[T-Access]
-{\env e : C \andalso field(C, f) = \tau}
+{\env e : cn \andalso field(cn, f) = \tau}
 {\env e.f : \tau}
 
 \infrule[T-NumOps]
-{\bop \in \{+, -, *, \div, <, \leq\} \andalso \env e_1: \intt \andalso \env e_2: \intt}
+{\bop \in \{+, -, *, \div\} \andalso \env e_1: \intt \andalso \env e_2: \intt}
 {\env e_1 \bop e_2: \intt}
+
+\infrule[T-Comparison]
+{\bop \in \{<, \leq\} \andalso \env e_1: \tau \andalso \env e_2: \tau \andalso \tau \in \{\strt, \intt \}}
+{\env e_1 \bop e_2: \boolt}
 
 \infrule[T-BoolOps]
 {\bop \in \{\land, \lor\} \andalso \env e_1 : \boolt \andalso \env e_2: \boolt}
