@@ -41,9 +41,27 @@ FetherweightJava paper and is a map from class names to class declarations. Prov
 method types for a given class.  A program then is a pair (CT, e), we also make the assumption that the ClassTable is fixed.
 
 \begin{align*}
-t \in ClassTable = ClassName \rightarrow ((Variable \rightarrow Type) \times (MethodName \rightarrow MethodType)) \\
-mt \in MethodType = MethodName \rightarrow (\overrightarrow{Type}, Type)
+t \in ClassTable = ClassName \rightarrow ((Variable \rightarrow Type) \times (MethodName \rightarrow Type)) 
 \end{align*}
+
+We assume that the ClassTable is fixed for a given run of the interpreter.
+
+\begin{flalign*}
+&inittypechecker : Program \rightarrow (ClassTable \times Program)
+\\
+&inittypechecker p = foldl(\lambda acc. \lambda class.\ acc \cup [\pi_cn \mapsto (fields, methods)], [], p)\ where\\
+	&fields = \lambda x.\ pi_f(class)(x)\\
+	&methods = \lambda x.\ pi_m(class)(x)
+\\\\
+&field : ClassName \times Variable \rightarrow Type
+\\
+&field\ \cname\ x = \pi_1(t(\cname))(x)
+\\\\
+&method : ClassName \times Variable \rightarrow Type
+\\
+&method\ \mname\ x = \pi_2(t(\cname))(x)
+\\
+\end{flalign*}
 
 \subsection{Subtyping}
 
