@@ -2,6 +2,6 @@ class DoubleForString {
   fields x: string;
 
   def DoubleForString() = {
-    x := 2;
+    self.x := 2;
   }
 }
