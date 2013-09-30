@@ -1,0 +1,20 @@
+class BinTreeNode {
+  fields data: int, left: BinTreeNode, right: BinTreeNode;
+
+  def lookup(key: int, node: BinTreeNode, result: bool): bool = {
+    if (node = null) {
+      result := false;
+    } else {
+      if (key = node.data) {
+        result := true;
+      } else {
+        if (key < node.data) {
+          result := node.left.lookup(key);
+        } else {
+          result := node.right.lookup(key);
+        };
+      };
+    };
+    return result;
+  }
+}
