@@ -230,8 +230,8 @@ object typechecker {
           }
 
           case ⌜<⌝ | ⌜≤⌝ => types match {
-            case (IntT, IntT) => IntT
-            case (StrT, StrT) => StrT
+            case (IntT, IntT) => BoolT
+            case (StrT, StrT) => BoolT
             case (t1, t2)     =>
               throw Illtyped(s"${pt(t1)} ${pt(t2)}  must both be either int or string.")
           }
