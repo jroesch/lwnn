@@ -29,7 +29,7 @@ class SuccessfulTestCase < TestCase
     @result = result = `sbt "run #{@file_name}"`
     if result =~ /Parse error: .*\nAt line: .*/
       @status = :parse_error
-    elsif result =~ /cs260.lwnn.Illtyped.*/
+    elsif result =~ /TypeError.*/
       @status = :typechecking_error
     else
       @status = :success
@@ -41,7 +41,7 @@ end
 class FailingTestCase < TestCase
   def run
     @result = result = `sbt "run #{@file_name}"`
-    if result =~ /Parse error: .*\nAt line: .*/ || result =~ /cs260.lwnn.Illtyped/
+    if result =~ /Parse error: .*\nAt line: .*/ || result =~ /TypeError/
       @status = :success
     else
       @status = :false_positive
