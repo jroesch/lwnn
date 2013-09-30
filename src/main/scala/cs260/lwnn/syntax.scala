@@ -272,18 +272,15 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
     case v ~ _ ~ _ ~ cls ~ params => New(v, cls, params)
   }
 
-  lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ opt(expName <~ ".") ~ methodName ~ argList ^^ {
-    case ov ~ obj  ~ mname ~ params =>
-      val receiver = obj match {
-        case Some(o) => o
-        case None => Var("self")
-      }
+  lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ E ~ argList ^^ {
+    case ov ~ exps ~ params =>
+      val Access(e, Var(mn)) = exps
 
       val v = ov match {
         case Some(vn) => vn
         case None     => syntheticVar()
       }
-      Call(v, receiver, mname, params)
+      Call(v, e, mn, params)
   }
 
   lazy val ifStmt: Parser[Stmt] = "if" ~ ("(" ~> expP <~ ")") ~ block ~ opt("else" ~>  block) ^^ {
