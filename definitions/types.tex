@@ -49,9 +49,9 @@ We assume that the ClassTable is fixed for a given run of the interpreter.
 \begin{flalign*}
 &inittypechecker : Program \rightarrow (ClassTable \times Program)
 \\
-&inittypechecker p = foldl(\lambda acc. \lambda class.\ acc \cup [\pi_cn \mapsto (fields, methods)], [], p)\ where\\
-	&fields = \lambda x.\ pi_f(class)(x)\\
-	&methods = \lambda x.\ pi_m(class)(x)
+&inittypechecker p = foldl(\lambda acc. \lambda class.\ acc \cup [\pi_cn \mapsto (fields, methods)], [], p)\ \text{where}\\
+&\qquad fields = \lambda x.\ \pi_f(class)(x)\\
+&\qquad methods = \lambda x.\ \pi_m(class)(x)
 \\\\
 &field : ClassName \times Variable \rightarrow Type
 \\
