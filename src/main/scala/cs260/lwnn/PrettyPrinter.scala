@@ -78,7 +78,7 @@ class PrettyPrinter(t: AST) {
     case Binop(op, e1, e2) =>
       val pOp = op match {
         case ⌜+⌝ => "+"
-        case ⌜−⌝ => "_"
+        case ⌜−⌝ => "-"
         case ⌜×⌝ => "*"
         case ⌜÷⌝ => "/"
         case ⌜<⌝ => "<"

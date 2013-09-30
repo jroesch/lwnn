@@ -274,7 +274,12 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val methodCall: Parser[Stmt] = opt(variable <~ ":=") ~ E ~ argList ^^ {
     case ov ~ exps ~ params =>
-      val Access(e, Var(mn)) = exps
+      val (e, mn) = exps match {
+        case Access(o, Var(m)) => (o, m)
+        case _ =>
+          /* better err msg? */
+          throw new Exception(s"No receiver for method call $exps.")
+      }
 
       val v = ov match {
         case Some(vn) => vn
@@ -337,7 +342,7 @@ object LwnnParser extends StandardTokenParsers with PackratParsers {
 
   lazy val binOpP = (
       "+"  ^^^ ⌜+⌝
-    | "_"  ^^^ ⌜−⌝
+    | "-"  ^^^ ⌜−⌝
     | "*"  ^^^ ⌜×⌝
     | "/"  ^^^ ⌜÷⌝
     | "<"  ^^^ ⌜<⌝
