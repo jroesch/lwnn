@@ -10,14 +10,58 @@ class LinkedListNode {
 class LinkedList {
   fields head: LinkedListNode;
 
-  def LinkedList(data: int, next: LinkedListNode, h: LinkedListNode) = {
-    h := new LinkedListNode(data, null);
-    self.head := h;
+  def LinkedList(size: int, cursor: LinkedListNode, tmp: LinkedListNode) = {
+    while (size != 0) {
+        if (cursor = null) {
+          cursor := new LinkedListNode(0, null);
+        } else {
+          cursor := cursor.next;
+          tmp := new LinkedListNode(0, null);
+          cursor.next := tmp;
+        };
+    };
+    self.head := cursor;
   }
 
-  def cons(data: int, temp: LinkedListNode) = {
-    temp := new LinkedListNode(data, self.head);
-    self.head := temp;
+  def length(count: int, cursor: LinkedListNode): int = {
+    cursor := self.head;
+    while (cursor != null) {
+      count := count + 1;
+      cursor := cursor.next;
+    };
+    return count;
+  }
+
+  def get(i: int, cursor: LinkedListNode): int = {
+    cursor := self.head;
+    while (0 < i) {
+        i := i - 1;
+        cursor := cursor.next; 
+    };
+    return cursor.data; 
+  }
+
+  def update(i: int, x: int, cursor: LinkedListNode) = {
+    cursor := self.head;
+    while (0 < i) {
+        i := i - 1;
+        cursor := cursor.next; 
+    };
+    cursor.data := x; 
+  }
+    
+  def cons(data: int, cursor: LinkedListNode) = {
+    cursor := new LinkedListNode(data, self.head);
+    self.head := cursor;
+  }
+  
+  def append(data: int, cursor: LinkedListNode, tmp: LinkedListNode) = {
+    cursor := self.head;
+    while(cursor.next != null) {
+      cursor := cursor.next;
+    };
+    tmp := new LinkedListNode(0, null);
+    cursor.next := tmp;
   }
 
   def delete(slot: int, temp: LinkedListNode, count : int): int = {
@@ -31,4 +75,21 @@ class LinkedList {
     temp.next := temp.next.next;
     return count;
   }
+
+  def sort(newLL: LinkedList, len: int, i: int, elem: int, hole: int, tmp: int) = {
+    len := self.length();
+    i := 1;
+    while (i < len) {
+        elem := self.get(i);
+        hole := i;
+        tmp := self.get(hole - 1);
+        while ((0 < hole) & (elem < tmp)) {
+            tmp := self.get(hole - 1);
+            self.update(hole, tmp);
+            hole := hole - 1;
+        };
+        self.update(hole, elem);
+        i := i + 1;
+    };
+  }   
 }
