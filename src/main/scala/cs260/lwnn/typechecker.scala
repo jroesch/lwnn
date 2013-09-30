@@ -157,7 +157,7 @@ object typechecker {
         if (fieldT ⊑ check(e2)) NullT
         else throw Illtyped(s"In `${pp(term)}` field has type ${pt(fieldT)} and `${pp(e2)}` has type ${pt(check(e2))}")
 
-      case Call(x, e, mn, args) =>
+      case c @ Call(x, e, mn, args) =>
         val fieldT = check(x)
         val method = classTable.method(check(e), Var(mn))
         for ((d, a) <- method.argTs.zip(args)) {
@@ -166,7 +166,7 @@ object typechecker {
         }
 
         if (!(method.returnT ⊑ fieldT))
-          throw Illtyped(s"${ method.returnT } is not subtype $fieldT")
+          throw Illtyped(s"${method.returnT} is not subtype $fieldT in `${pp(c)}`")
         NullT
 
       case New(x, cn, args) =>

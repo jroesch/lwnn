@@ -6,6 +6,6 @@ class Subtyping {
   fields x: A;
 
   def Subtyping() = {
-    x := new C();
+    self.x := new C();
   }
 }

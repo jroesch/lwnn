@@ -2,7 +2,7 @@ class A {
   fields a : int, b: int;
 
   def set(x: int, y: int) = {
-    a := x;
-    b := y;
+    self.a := x;
+    self.b := y;
   }
 }
