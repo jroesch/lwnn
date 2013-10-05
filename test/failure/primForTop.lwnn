@@ -1,0 +1,5 @@
+class PrimForTop {
+  def PrimForTop(top: TopObject) = {
+    top := 10;
+  }
+}

@@ -154,7 +154,7 @@ object typechecker {
         val receiverT = check(e1)
         val clazz = classTable(receiverT)
         val fieldT = classTable.field(clazz.selfType, x)
-        if (fieldT ⊑ check(e2)) NullT
+        if (check(e2) ⊑ fieldT) NullT
         else throw Illtyped(s"In `${pp(term)}` field has type ${pt(fieldT)} and `${pp(e2)}` has type ${pt(check(e2))}")
 
       case c @ Call(x, e, mn, args) =>

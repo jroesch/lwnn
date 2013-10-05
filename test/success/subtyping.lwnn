@@ -3,9 +3,19 @@ class B extends A {}
 class C extends B {}
 
 class Subtyping {
-  fields x: A;
+  fields a: A, b: B, c: C;
 
-  def Subtyping() = {
-    self.x := new C();
+  def Subtyping(tmp: C) = {
+    tmp := new C();
+    self.a := tmp;
+    self.b := tmp;
+    self.c := tmp;
+    self.takeA(tmp);
+    self.takeB(tmp);
+    self.takeC(tmp);
   }
+
+  def takeA(a: A): int = { return 0; }
+  def takeB(b: A): int = { return 0; }
+  def takeC(c: C): int = { return 0; }
 }
